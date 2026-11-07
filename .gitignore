@@ -1,0 +1,41 @@
+# ---------- Java / Maven ----------
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+!**/src/**/*.jar
+hs_err_pid*
+
+# ---------- IDE ----------
+# Eclipse / Spring Tool Suite
+.project
+.classpath
+.settings/
+.factorypath
+.sts4-cache/
+.springBeans
+bin/
+# IntelliJ
+.idea/
+*.iml
+# VS Code
+.vscode/
+
+# ---------- Node / React ----------
+node_modules/
+dist/
+build/
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# ---------- Variables de entorno y secretos ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Logs y sistema ----------
+logs/
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+# Normaliza los finales de línea: el equipo trabaja en Windows y los pipelines corren en Linux
+* text=auto eol=lf
+
+# Scripts de Windows con CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Archivos binarios
+*.jar binary
+*.png binary
+*.jpg binary
+*.pdf binary
