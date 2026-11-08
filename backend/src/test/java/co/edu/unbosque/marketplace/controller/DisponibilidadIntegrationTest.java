@@ -238,11 +238,14 @@ class DisponibilidadIntegrationTest {
 	void laBaseDeDatosImpideReservasActivasSuperpuestas() {
 		reservar(HOY.plusDays(10), HOY.plusDays(15), "NULL");
 
-		assertThatThrownBy(() -> reservar(HOY.plusDays(12), HOY.plusDays(14), "NULL"))
+		LocalDate llegada = HOY.plusDays(12);
+		LocalDate salida = HOY.plusDays(14);
+
+		assertThatThrownBy(() -> reservar(llegada, salida, "NULL"))
 				.isInstanceOf(DataIntegrityViolationException.class);
 
 		// Una reserva liberada ya no bloquea
 		jdbc.update("UPDATE periodo_reservado SET liberado_en = now()");
-		reservar(HOY.plusDays(12), HOY.plusDays(14), "NULL");
+		reservar(llegada, salida, "NULL");
 	}
 }

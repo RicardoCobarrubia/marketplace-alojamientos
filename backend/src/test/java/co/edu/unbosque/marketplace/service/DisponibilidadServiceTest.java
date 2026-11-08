@@ -85,10 +85,14 @@ class DisponibilidadServiceTest {
 
 	@Test
 	void rechazaLlegadaAnteriorAHoyYSalidaNoPosterior() {
-		assertThatThrownBy(() -> servicio.consultar(huesped, 10L, HOY.minusDays(1), HOY.plusDays(2)))
+		LocalDate ayer = HOY.minusDays(1);
+		LocalDate pasadoManana = HOY.plusDays(2);
+		LocalDate enTresDias = HOY.plusDays(3);
+
+		assertThatThrownBy(() -> servicio.consultar(huesped, 10L, ayer, pasadoManana))
 				.isInstanceOf(SolicitudInvalidaException.class)
 				.hasFieldOrPropertyWithValue("codigo", "FECHAS_INVALIDAS");
-		assertThatThrownBy(() -> servicio.consultar(huesped, 10L, HOY.plusDays(3), HOY.plusDays(3)))
+		assertThatThrownBy(() -> servicio.consultar(huesped, 10L, enTresDias, enTresDias))
 				.isInstanceOf(SolicitudInvalidaException.class);
 	}
 
@@ -137,17 +141,21 @@ class DisponibilidadServiceTest {
 	@Test
 	void rechazaFechasInvalidasPeriodosCruzadosYOtroUsuario() {
 		existe();
-		assertThatThrownBy(() -> servicio.crearPeriodo(dueno, 10L, periodo(HOY.plusDays(5), HOY.plusDays(5))))
+		PeriodoDisponibleDTO sinNoches = periodo(HOY.plusDays(5), HOY.plusDays(5));
+		PeriodoDisponibleDTO desdeAyer = periodo(HOY.minusDays(1), HOY.plusDays(5));
+		PeriodoDisponibleDTO valido = periodo(HOY, HOY.plusDays(5));
+
+		assertThatThrownBy(() -> servicio.crearPeriodo(dueno, 10L, sinNoches))
 				.isInstanceOf(SolicitudInvalidaException.class);
-		assertThatThrownBy(() -> servicio.crearPeriodo(dueno, 10L, periodo(HOY.minusDays(1), HOY.plusDays(5))))
+		assertThatThrownBy(() -> servicio.crearPeriodo(dueno, 10L, desdeAyer))
 				.isInstanceOf(SolicitudInvalidaException.class);
 
 		when(periodoRepository.existeOtroQueSeCruza(eq(10L), eq(-1L), any(), any())).thenReturn(true);
-		assertThatThrownBy(() -> servicio.crearPeriodo(dueno, 10L, periodo(HOY, HOY.plusDays(5))))
+		assertThatThrownBy(() -> servicio.crearPeriodo(dueno, 10L, valido))
 				.isInstanceOf(ReglaNegocioException.class)
 				.hasFieldOrPropertyWithValue("codigo", "PERIODO_SUPERPUESTO");
 
-		assertThatThrownBy(() -> servicio.crearPeriodo(otro, 10L, periodo(HOY, HOY.plusDays(5))))
+		assertThatThrownBy(() -> servicio.crearPeriodo(otro, 10L, valido))
 				.isInstanceOf(AccesoDenegadoException.class);
 	}
 
@@ -161,7 +169,9 @@ class DisponibilidadServiceTest {
 		when(reservadoRepository.buscarVigentesQueSeCruzan(10L, HOY, HOY.plusDays(30), AHORA))
 				.thenReturn(List.of(reservado(HOY.plusDays(20), HOY.plusDays(25))));
 
-		assertThatThrownBy(() -> servicio.editarPeriodo(dueno, 10L, 5L, periodo(HOY, HOY.plusDays(10))))
+		PeriodoDisponibleDTO reducido = periodo(HOY, HOY.plusDays(10));
+
+		assertThatThrownBy(() -> servicio.editarPeriodo(dueno, 10L, 5L, reducido))
 				.isInstanceOf(ReglaNegocioException.class)
 				.hasFieldOrPropertyWithValue("codigo", "PERIODO_CON_RESERVAS");
 		assertThatThrownBy(() -> servicio.eliminarPeriodo(dueno, 10L, 5L))
