@@ -31,6 +31,12 @@
 		<springdoc.version>3.2.0</springdoc.version>
 		<modelmapper.version>3.2.8</modelmapper.version>
 		<jacoco.version>0.8.16</jacoco.version>
+
+		<!-- SonarCloud (MA-92): el análisis corre desde GitHub Actions -->
+		<sonar.organization>1020</sonar.organization>
+		<sonar.projectKey>RicardoCobarrubia_marketplace-alojamientos</sonar.projectKey>
+		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
+		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
 	<dependencies>
 		<dependency>

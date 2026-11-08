@@ -1,6 +1,7 @@
-# MA-91: integración continua del backend.
+# MA-91 y MA-92: integración continua del backend.
 # Se ejecuta en cada Pull Request y en cada push a main: compila, corre las pruebas
-# (unitarias y de integración con Testcontainers) y genera el reporte de cobertura JaCoCo.
+# (unitarias y de integración con Testcontainers), genera el reporte de cobertura JaCoCo
+# y envía el análisis a SonarCloud, que publica el Quality Gate en el PR.
 
 name: CI backend
 
@@ -27,6 +28,11 @@ jobs:
       run:
         working-directory: backend
 
+    env:
+      # Token de SonarCloud guardado en Settings → Secrets and variables → Actions
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PLUGIN: org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211
+
     steps:
       - name: Descargar el código
         uses: actions/checkout@v4
@@ -44,6 +50,13 @@ jobs:
       - name: Compilar, probar y medir cobertura
         # Las pruebas de integración usan Testcontainers; ubuntu-latest ya trae Docker
         run: ./mvnw -B -ntp verify
+
+      - name: Análisis de SonarCloud
+        # Si el secreto no existe (por ejemplo, en un PR desde un fork) se salta este paso
+        if: env.SONAR_TOKEN != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./mvnw -B -ntp $SONAR_PLUGIN:sonar
 
       - name: Guardar reporte de cobertura
         if: always()
