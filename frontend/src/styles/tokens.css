@@ -1,0 +1,36 @@
+/* Tokens de diseño tomados del mockup de Figma "LR Alojamientos – Mockup interactivo". */
+:root {
+  /* Cafés */
+  --color-cafe-oscuro: #3d2b22;
+  --color-cafe: #5b4233;
+  --color-cafe-hover: #4a3428;
+  --color-arena: #cdb48f;
+
+  /* Fondos y superficies */
+  --color-fondo: #f4efe6;
+  --color-fondo-suave: #ece3d3;
+  --color-superficie: #ffffff;
+  --color-borde: #e4dacb;
+  --color-borde-foco: #8c6b52;
+
+  /* Texto */
+  --color-texto: #3a2a20;
+  --color-texto-suave: #8b7b6c;
+  --color-crema: #f4ebdd;
+  --color-texto-sobre-oscuro: #c8b6a2;
+
+  /* Estados */
+  --color-error: #a63d2f;
+  --color-error-fondo: #fbeae6;
+  --color-error-borde: #efc4bb;
+
+  /* Tipografía */
+  --fuente-titulos: 'Lora', Georgia, 'Times New Roman', serif;
+  --fuente-texto: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Forma */
+  --radio-sm: 6px;
+  --radio: 8px;
+  --radio-lg: 12px;
+  --sombra-foco: 0 0 0 3px rgba(140, 107, 82, 0.2);
+}
