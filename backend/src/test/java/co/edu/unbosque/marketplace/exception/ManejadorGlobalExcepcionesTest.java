@@ -32,22 +32,25 @@ class ManejadorGlobalExcepcionesTest {
 
 	@Test
 	void recursoNoEncontradoResponde404() {
-		ProblemDetail problema = manejador.manejarRecursoNoEncontrado(
+		ProblemDetail problema = manejador.manejarExcepcionDeNegocio(
 				new RecursoNoEncontradoException("No existe el alojamiento 7."));
 
 		assertThat(problema.getStatus()).isEqualTo(404);
 		assertThat(problema.getTitle()).isEqualTo("Recurso no encontrado");
 		assertThat(problema.getDetail()).isEqualTo("No existe el alojamiento 7.");
-		assertThat(problema.getProperties()).containsEntry("correlationId", "peticion-1");
+		assertThat(problema.getProperties())
+				.containsEntry("correlationId", "peticion-1")
+				.containsEntry("codigo", "RECURSO_NO_ENCONTRADO");
 	}
 
 	@Test
 	void reglaDeNegocioResponde409() {
-		ProblemDetail problema = manejador.manejarReglaNegocio(
-				new ReglaNegocioException("Las fechas ya están ocupadas."));
+		ProblemDetail problema = manejador.manejarExcepcionDeNegocio(
+				new ReglaNegocioException("FECHAS_OCUPADAS", "Las fechas ya están ocupadas."));
 
 		assertThat(problema.getStatus()).isEqualTo(409);
 		assertThat(problema.getDetail()).isEqualTo("Las fechas ya están ocupadas.");
+		assertThat(problema.getProperties()).containsEntry("codigo", "FECHAS_OCUPADAS");
 	}
 
 	@Test
@@ -55,6 +58,7 @@ class ManejadorGlobalExcepcionesTest {
 		ProblemDetail problema = manejador.manejarAccesoDenegado(new AccessDeniedException("denegado"));
 
 		assertThat(problema.getStatus()).isEqualTo(403);
+		assertThat(problema.getProperties()).containsEntry("codigo", "ACCESO_DENEGADO");
 	}
 
 	@Test
@@ -63,7 +67,9 @@ class ManejadorGlobalExcepcionesTest {
 
 		assertThat(problema.getStatus()).isEqualTo(500);
 		assertThat(problema.getDetail()).doesNotContain("detalle interno");
-		assertThat(problema.getProperties()).containsEntry("correlationId", "peticion-1");
+		assertThat(problema.getProperties())
+				.containsEntry("correlationId", "peticion-1")
+				.containsEntry("codigo", "ERROR_INTERNO");
 	}
 
 	@Test
