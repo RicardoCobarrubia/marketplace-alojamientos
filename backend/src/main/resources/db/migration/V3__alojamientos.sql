@@ -73,6 +73,8 @@ CREATE TABLE regla_alojamiento (
     descripcion    VARCHAR(300) NOT NULL,
     orden          SMALLINT     NOT NULL
 );
+-- Se cargan por alojamiento cada vez que se muestra uno
+CREATE INDEX ix_regla_alojamiento ON regla_alojamiento (alojamiento_id, orden);
 
 CREATE TABLE imagen_alojamiento (
     id             BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -81,6 +83,7 @@ CREATE TABLE imagen_alojamiento (
     es_principal   BOOLEAN      NOT NULL DEFAULT false,
     orden          SMALLINT     NOT NULL
 );
+CREATE INDEX ix_imagen_alojamiento ON imagen_alojamiento (alojamiento_id, orden);
 
 -- MA-55. "activo" permite retirar un servicio sin borrar el que ya contrató una reserva.
 CREATE TABLE servicio_adicional (

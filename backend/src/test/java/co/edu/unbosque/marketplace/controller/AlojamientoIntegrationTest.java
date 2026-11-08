@@ -265,7 +265,35 @@ class AlojamientoIntegrationTest {
 				.andExpect(jsonPath("$.codigo").value("TRANSICION_INVALIDA"));
 
 		como(anfitrion, post("/api/alojamientos/" + id + "/enviar-revision")).andExpect(status().isOk());
+		// El anfitrión no puede saltarse la aprobación del administrador
+		como(anfitrion, post("/api/alojamientos/" + id + "/reanudar"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.codigo").value("TRANSICION_INVALIDA"));
 		como(anfitrion, post("/api/admin/alojamientos/" + id + "/aprobar")).andExpect(status().isForbidden());
 		como(otroAnfitrion, post("/api/alojamientos/" + id + "/pausar")).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void elAnfitrionNoSacaUnAlojamientoBloqueado() throws Exception {
+		long id = crear(anfitrion);
+		jdbc.update("UPDATE alojamiento SET estado = 'BLOQUEADA' WHERE id = ?", id);
+
+		como(anfitrion, post("/api/alojamientos/" + id + "/pausar"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.codigo").value("TRANSICION_INVALIDA"));
+		como(anfitrion, post("/api/alojamientos/" + id + "/reanudar"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.codigo").value("TRANSICION_INVALIDA"));
+	}
+
+	@Test
+	void rechazarExigeElMotivo() throws Exception {
+		long id = crear(anfitrion);
+		como(anfitrion, post("/api/alojamientos/" + id + "/enviar-revision")).andExpect(status().isOk());
+
+		como(administrador, post("/api/admin/alojamientos/" + id + "/rechazar")
+				.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errores.motivoRechazo").exists());
 	}
 }

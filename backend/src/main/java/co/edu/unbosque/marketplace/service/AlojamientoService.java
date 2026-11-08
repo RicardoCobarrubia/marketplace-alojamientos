@@ -156,13 +156,13 @@ public class AlojamientoService {
 	/** ACTIVA → PAUSADA. No cancela reservas ni requiere nueva revisión. */
 	@Transactional
 	public AlojamientoDTO pausar(Usuario anfitrion, Long alojamientoId) {
-		return cambiarEstadoDelDueno(anfitrion, alojamientoId, EstadoAlojamiento.PAUSADA);
+		return cambiarEstadoDelDueno(anfitrion, alojamientoId, EstadoAlojamiento.ACTIVA, EstadoAlojamiento.PAUSADA);
 	}
 
 	/** PAUSADA → ACTIVA, sin nueva revisión. */
 	@Transactional
 	public AlojamientoDTO reanudar(Usuario anfitrion, Long alojamientoId) {
-		return cambiarEstadoDelDueno(anfitrion, alojamientoId, EstadoAlojamiento.ACTIVA);
+		return cambiarEstadoDelDueno(anfitrion, alojamientoId, EstadoAlojamiento.PAUSADA, EstadoAlojamiento.ACTIVA);
 	}
 
 	// ─────────────────────────────────────────
@@ -247,10 +247,18 @@ public class AlojamientoService {
 				solicitud.imagenes());
 	}
 
+	/**
+	 * Pausar y reanudar solo parten de un estado concreto. Sin esto, el anfitrión podría activar
+	 * un alojamiento PENDIENTE_REVISION sin la aprobación del administrador, o sacar uno BLOQUEADA.
+	 */
 	private AlojamientoDTO cambiarEstadoDelDueno(Usuario anfitrion, Long alojamientoId,
-			EstadoAlojamiento destino) {
+			EstadoAlojamiento origen, EstadoAlojamiento destino) {
 		Alojamiento alojamiento = buscarDelDueno(anfitrion, alojamientoId);
 		EstadoAlojamiento anterior = alojamiento.getEstado();
+		if (anterior != origen) {
+			throw new ReglaNegocioException("TRANSICION_INVALIDA",
+					"No se puede pasar de " + anterior + " a " + destino + ".");
+		}
 		alojamiento.cambiarEstado(destino, reloj.instant());
 		registrarCambioDeEstado(alojamiento, anterior, anfitrion);
 		return AlojamientoDTO.desde(alojamiento);
