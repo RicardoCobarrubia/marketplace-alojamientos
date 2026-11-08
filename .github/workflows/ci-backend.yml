@@ -63,7 +63,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./mvnw -B -ntp $SONAR_PLUGIN:sonar
+        run: ./mvnw -B -ntp "${SONAR_PLUGIN}:sonar"
 
       - name: Guardar reporte de cobertura
         if: always()

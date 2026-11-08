@@ -13,15 +13,18 @@ Maven no hace falta instalarlo: el proyecto trae el wrapper (`mvnw` / `mvnw.cmd`
 
 Todo se ejecuta desde la carpeta `backend`.
 
-1. Crea tu archivo de variables: copia `.env.example` como `.env` y cambia `DB_PASSWORD`.
+1. Crea tu archivo de variables: copia `.env.example` como `.env` y cambia `DB_PASSWORD`. Usa solo letras, números, `-` y `_`: Docker Compose interpreta el `$` y la base de datos y la API quedarían con claves distintas.
 2. Levanta PostgreSQL y Mailpit:
    ```
    docker compose up -d
    ```
-3. Arranca la API:
+3. Arranca la API. En Windows (cmd o PowerShell):
    ```
-   mvnw.cmd spring-boot:run      (Windows)
-   ./mvnw spring-boot:run        (Linux / macOS / Git Bash)
+   mvnw.cmd spring-boot:run
+   ```
+   En Linux, macOS o Git Bash:
+   ```
+   ./mvnw spring-boot:run
    ```
 
 Con la API arriba:
@@ -34,9 +37,16 @@ Con la API arriba:
 
 ## Pruebas
 
+En Windows (cmd o PowerShell):
+
 ```
-mvnw.cmd verify      (Windows)
-./mvnw verify        (Linux / macOS / Git Bash)
+mvnw.cmd verify
+```
+
+En Linux, macOS o Git Bash:
+
+```
+./mvnw verify
 ```
 
 Corre las pruebas y deja la cobertura en `target/site/jacoco/`. Las pruebas de integración levantan un PostgreSQL con Testcontainers, así que Docker debe estar abierto.

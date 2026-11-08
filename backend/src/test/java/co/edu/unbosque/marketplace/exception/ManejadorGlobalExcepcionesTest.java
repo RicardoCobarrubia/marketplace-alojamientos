@@ -7,7 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.context.request.ServletWebRequest;
 
 import co.edu.unbosque.marketplace.filter.CorrelacionFilter;
 
@@ -59,5 +64,18 @@ class ManejadorGlobalExcepcionesTest {
 		assertThat(problema.getStatus()).isEqualTo(500);
 		assertThat(problema.getDetail()).doesNotContain("detalle interno");
 		assertThat(problema.getProperties()).containsEntry("correlationId", "peticion-1");
+	}
+
+	@Test
+	void losErroresEstandarDeSpringTambienLlevanElIdDeCorrelacion() throws Exception {
+		HttpMessageNotReadableException jsonMalFormado = new HttpMessageNotReadableException("JSON mal formado",
+				new MockHttpInputMessage(new byte[0]));
+
+		ResponseEntity<Object> respuesta = manejador.handleException(jsonMalFormado,
+				new ServletWebRequest(new MockHttpServletRequest()));
+
+		assertThat(respuesta.getStatusCode().value()).isEqualTo(400);
+		assertThat(respuesta.getBody()).isInstanceOfSatisfying(ProblemDetail.class, problema ->
+				assertThat(problema.getProperties()).containsEntry("correlationId", "peticion-1"));
 	}
 }
