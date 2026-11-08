@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -66,7 +67,7 @@ public class SecurityConfig {
 				.accessDeniedHandler(respuestas))
 			.authorizeHttpRequests(auth -> auth
 				// Públicas
-				.requestMatchers("/api/auth/**").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login").permitAll()
 				.requestMatchers("/actuator/health/**").permitAll()
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 

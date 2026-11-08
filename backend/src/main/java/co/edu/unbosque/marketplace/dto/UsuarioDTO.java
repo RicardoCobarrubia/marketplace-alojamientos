@@ -38,11 +38,11 @@ public record UsuarioDTO(
 		String email,
 
 		@NotBlank(groups = Registro.class, message = "El teléfono es obligatorio.")
-		@Pattern(groups = Registro.class, regexp = "^\\+?[0-9 ]{7,20}$",
+		@Pattern(groups = Registro.class, regexp = "^\\+?[0-9][0-9 ]{6,18}$",
 				message = "El teléfono debe tener entre 7 y 20 dígitos.")
 		String telefono,
 
-		/* BCrypt solo usa los primeros 72 bytes, por eso el máximo. */
+		/* BCrypt solo usa los primeros 72 bytes: el servicio revisa además el tamaño en bytes. */
 		@JsonProperty(access = Access.WRITE_ONLY)
 		@NotBlank(groups = { Registro.class, Login.class }, message = "La contraseña es obligatoria.")
 		@Size(groups = Registro.class, min = 8, max = 72,

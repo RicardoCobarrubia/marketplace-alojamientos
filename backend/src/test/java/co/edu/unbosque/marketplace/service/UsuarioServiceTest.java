@@ -98,6 +98,18 @@ class UsuarioServiceTest {
 	}
 
 	@Test
+	void rechazaUnaContrasenaDeMasDe72Bytes() {
+		// 40 caracteres, pero 80 bytes en UTF-8
+		UsuarioDTO datos = new UsuarioDTO(null, "Ana Pérez", "ana@correo.com", "3001234567",
+				"ñ".repeat(40), Rol.HUESPED, null);
+
+		assertThatThrownBy(() -> servicio.registrar(datos))
+				.isInstanceOf(SolicitudInvalidaException.class)
+				.hasFieldOrPropertyWithValue("codigo", "CONTRASENA_MUY_LARGA");
+		verify(usuarioRepository, never()).saveAndFlush(any());
+	}
+
+	@Test
 	void rechazaUnCorreoYaRegistrado() {
 		when(usuarioRepository.existsByEmail("ana@correo.com")).thenReturn(true);
 
@@ -127,7 +139,7 @@ class UsuarioServiceTest {
 	@Test
 	void conCredencialesValidasDevuelveElUsuarioYReiniciaLosIntentos() {
 		usuario.registrarIntentoFallido(AHORA, 5, Duration.ofMinutes(15));
-		when(usuarioRepository.findByEmail("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
 		when(authenticationManager.authenticate(any()))
 				.thenReturn(UsernamePasswordAuthenticationToken.authenticated(usuario, null, usuario.getAuthorities()));
 
@@ -139,7 +151,7 @@ class UsuarioServiceTest {
 
 	@Test
 	void conCorreoInexistenteDaElErrorGenerico() {
-		when(usuarioRepository.findByEmail("ana@correo.com")).thenReturn(Optional.empty());
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.empty());
 		when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("x"));
 
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
@@ -148,7 +160,7 @@ class UsuarioServiceTest {
 
 	@Test
 	void conContrasenaIncorrectaSumaUnIntentoFallidoYDespuesDeCincoSeBloquea() {
-		when(usuarioRepository.findByEmail("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
 		when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("x"));
 
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
@@ -165,7 +177,7 @@ class UsuarioServiceTest {
 
 	@Test
 	void unaCuentaRestringidaNoEntra() {
-		when(usuarioRepository.findByEmail("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
 		when(authenticationManager.authenticate(any())).thenThrow(new LockedException("x"));
 
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
@@ -174,7 +186,7 @@ class UsuarioServiceTest {
 
 	@Test
 	void unaCuentaDesactivadaRecibeElCodigoParaReactivarse() {
-		when(usuarioRepository.findByEmail("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
 		when(authenticationManager.authenticate(any())).thenThrow(new DisabledException("x"));
 
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))

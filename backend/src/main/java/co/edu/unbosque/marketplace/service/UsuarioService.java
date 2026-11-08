@@ -1,5 +1,6 @@
 package co.edu.unbosque.marketplace.service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -41,6 +42,7 @@ public class UsuarioService {
 
 	private static final Logger log = LoggerFactory.getLogger(UsuarioService.class);
 	static final String CORREO_DUPLICADO = "CORREO_YA_REGISTRADO";
+	private static final int MAXIMO_BYTES_CONTRASENA = 72;
 
 	private final UsuarioRepository usuarioRepository;
 	private final PasswordEncoder passwordEncoder;
@@ -74,6 +76,11 @@ public class UsuarioService {
 		if (!solicitud.rol().sePuedeElegirAlRegistrarse()) {
 			throw new SolicitudInvalidaException("ROL_NO_PERMITIDO",
 					"Solo puedes registrarte como huésped o anfitrión.");
+		}
+		// BCrypt rechaza más de 72 bytes; con tildes o ñ un carácter ocupa más de un byte
+		if (solicitud.password().getBytes(StandardCharsets.UTF_8).length > MAXIMO_BYTES_CONTRASENA) {
+			throw new SolicitudInvalidaException("CONTRASENA_MUY_LARGA",
+					"La contraseña es demasiado larga; usa menos caracteres especiales.");
 		}
 		String email = Usuario.normalizarEmail(solicitud.email());
 		if (usuarioRepository.existsByEmail(email)) {
@@ -109,7 +116,7 @@ public class UsuarioService {
 	public Usuario iniciarSesion(UsuarioDTO solicitud) {
 		Instant ahora = reloj.instant();
 		String email = Usuario.normalizarEmail(solicitud.email());
-		Optional<Usuario> registrado = usuarioRepository.findByEmail(email);
+		Optional<Usuario> registrado = usuarioRepository.buscarParaLogin(email);
 
 		if (registrado.isPresent() && registrado.get().estaBloqueadoTemporalmente(ahora)) {
 			throw new CuentaBloqueadaTemporalmenteException();
