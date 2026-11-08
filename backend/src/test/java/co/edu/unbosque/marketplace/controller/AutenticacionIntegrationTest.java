@@ -66,7 +66,8 @@ class AutenticacionIntegrationTest {
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.email").value("ana@correo.com"))
 				.andExpect(jsonPath("$.rol").value("HUESPED"))
-				.andExpect(jsonPath("$.passwordHash").doesNotExist());
+				.andExpect(jsonPath("$.passwordHash").doesNotExist())
+				.andExpect(jsonPath("$.password").doesNotExist());
 
 		String respuestaLogin = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
 						.content(login("ana@correo.com", "clave-segura-1")))

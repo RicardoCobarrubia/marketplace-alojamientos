@@ -19,10 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import co.edu.unbosque.marketplace.dto.LoginRequest;
-import co.edu.unbosque.marketplace.dto.RegistroRequest;
-import co.edu.unbosque.marketplace.dto.TokenResponse;
-import co.edu.unbosque.marketplace.dto.UsuarioResponse;
+import co.edu.unbosque.marketplace.dto.UsuarioDTO;
 import co.edu.unbosque.marketplace.exception.CredencialesInvalidasException;
 import co.edu.unbosque.marketplace.exception.CuentaBloqueadaTemporalmenteException;
 import co.edu.unbosque.marketplace.exception.CuentaDesactivadaException;
@@ -32,13 +29,12 @@ import co.edu.unbosque.marketplace.exception.ReglaNegocioException;
 import co.edu.unbosque.marketplace.exception.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.repository.UsuarioRepository;
-import co.edu.unbosque.marketplace.security.JwtUtil;
 
 /**
  * Registro, inicio de sesión y consulta de usuarios (MA-47, MA-48).
  * <p>
- * El login usa el {@code AuthenticationManager} de Spring Security, como en Software 1, pero
- * aquí y no en el controlador, y responde con excepciones en lugar de códigos numéricos.
+ * El login usa el {@code AuthenticationManager} de Spring Security, como en Software 1, y responde
+ * con excepciones en lugar de códigos numéricos. El token lo genera el controlador con JwtUtil.
  */
 @Service
 public class UsuarioService {
@@ -49,19 +45,17 @@ public class UsuarioService {
 	private final UsuarioRepository usuarioRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final AuthenticationManager authenticationManager;
-	private final JwtUtil jwtUtil;
 	private final Clock reloj;
 	private final int intentosMaximos;
 	private final Duration duracionBloqueo;
 
 	public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder,
-			AuthenticationManager authenticationManager, JwtUtil jwtUtil, Clock reloj,
+			AuthenticationManager authenticationManager, Clock reloj,
 			@Value("${marketplace.seguridad.intentos-maximos}") int intentosMaximos,
 			@Value("${marketplace.seguridad.duracion-bloqueo}") Duration duracionBloqueo) {
 		this.usuarioRepository = usuarioRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.authenticationManager = authenticationManager;
-		this.jwtUtil = jwtUtil;
 		this.reloj = reloj;
 		this.intentosMaximos = intentosMaximos;
 		this.duracionBloqueo = duracionBloqueo;
@@ -76,7 +70,7 @@ public class UsuarioService {
 	 * (escenario 2). La contraseña se guarda solo como hash BCrypt (escenario 3).
 	 */
 	@Transactional
-	public UsuarioResponse registrar(RegistroRequest solicitud) {
+	public UsuarioDTO registrar(UsuarioDTO solicitud) {
 		if (!solicitud.rol().sePuedeElegirAlRegistrarse()) {
 			throw new SolicitudInvalidaException("ROL_NO_PERMITIDO",
 					"Solo puedes registrarte como huésped o anfitrión.");
@@ -95,7 +89,7 @@ public class UsuarioService {
 			throw correoDuplicado();
 		}
 		log.info("Usuario registrado (usuario {}, rol {})", usuario.getId(), usuario.getRol());
-		return UsuarioResponse.desde(usuario);
+		return UsuarioDTO.desde(usuario);
 	}
 
 	// ─────────────────────────────────────────
@@ -103,7 +97,7 @@ public class UsuarioService {
 	// ─────────────────────────────────────────
 
 	/**
-	 * Valida las credenciales con el {@code AuthenticationManager} y devuelve el token.
+	 * Valida las credenciales con el {@code AuthenticationManager} y devuelve el usuario autenticado.
 	 * <ul>
 	 * <li>Correo o contraseña incorrectos: el mismo error en los dos casos (escenario 1).</li>
 	 * <li>5 intentos fallidos seguidos: bloqueo temporal de 15 minutos.</li>
@@ -112,7 +106,7 @@ public class UsuarioService {
 	 * El intento fallido se guarda aunque se lance la excepción, por eso {@code noRollbackFor}.
 	 */
 	@Transactional(noRollbackFor = CredencialesInvalidasException.class)
-	public TokenResponse iniciarSesion(LoginRequest solicitud) {
+	public Usuario iniciarSesion(UsuarioDTO solicitud) {
 		Instant ahora = reloj.instant();
 		String email = Usuario.normalizarEmail(solicitud.email());
 		Optional<Usuario> registrado = usuarioRepository.findByEmail(email);
@@ -140,11 +134,8 @@ public class UsuarioService {
 		Usuario usuario = (Usuario) autenticacion.getPrincipal();
 		usuario.registrarInicioSesionExitoso();
 		usuarioRepository.save(usuario);
-
-		String token = jwtUtil.generarToken(usuario);
 		log.info("Inicio de sesión exitoso (usuario {}, rol {})", usuario.getId(), usuario.getRol());
-		return TokenResponse.bearer(token, jwtUtil.extraerExpiracion(token).orElseThrow(),
-				UsuarioResponse.desde(usuario));
+		return usuario;
 	}
 
 	// ─────────────────────────────────────────
@@ -152,9 +143,9 @@ public class UsuarioService {
 	// ─────────────────────────────────────────
 
 	@Transactional(readOnly = true)
-	public UsuarioResponse obtener(Long usuarioId) {
+	public UsuarioDTO obtener(Long usuarioId) {
 		return usuarioRepository.findById(usuarioId)
-				.map(UsuarioResponse::desde)
+				.map(UsuarioDTO::desde)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El usuario no existe."));
 	}
 

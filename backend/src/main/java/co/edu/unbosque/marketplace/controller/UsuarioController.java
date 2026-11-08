@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import co.edu.unbosque.marketplace.dto.UsuarioResponse;
+import co.edu.unbosque.marketplace.dto.UsuarioDTO;
 import co.edu.unbosque.marketplace.model.Usuario;
 import co.edu.unbosque.marketplace.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,7 +28,7 @@ public class UsuarioController {
 	 */
 	@GetMapping("/me")
 	@Operation(summary = "Consultar mis datos")
-	public UsuarioResponse obtenerMisDatos(@AuthenticationPrincipal Usuario usuario) {
+	public UsuarioDTO obtenerMisDatos(@AuthenticationPrincipal Usuario usuario) {
 		return usuarioService.obtener(usuario.getId());
 	}
 }
