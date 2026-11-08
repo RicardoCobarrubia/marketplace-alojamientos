@@ -78,7 +78,10 @@ class JwtUtilTest {
 
 	@Test
 	void rechazaUnSecretoCorto() {
-		assertThatThrownBy(() -> new JwtUtil("corto", Duration.ofHours(2), Clock.systemUTC()))
+		Duration duracion = Duration.ofHours(2);
+		Clock reloj = Clock.systemUTC();
+
+		assertThatThrownBy(() -> new JwtUtil("corto", duracion, reloj))
 				.isInstanceOf(IllegalStateException.class);
 	}
 }

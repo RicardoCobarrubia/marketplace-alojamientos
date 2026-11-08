@@ -89,7 +89,9 @@ class UsuarioServiceTest {
 
 	@Test
 	void rechazaElRolAdministrador() {
-		assertThatThrownBy(() -> servicio.registrar(registro(Rol.ADMINISTRADOR)))
+		UsuarioDTO datos = registro(Rol.ADMINISTRADOR);
+
+		assertThatThrownBy(() -> servicio.registrar(datos))
 				.isInstanceOf(SolicitudInvalidaException.class)
 				.hasFieldOrPropertyWithValue("codigo", "ROL_NO_PERMITIDO");
 		verify(usuarioRepository, never()).saveAndFlush(any());
@@ -99,7 +101,9 @@ class UsuarioServiceTest {
 	void rechazaUnCorreoYaRegistrado() {
 		when(usuarioRepository.existsByEmail("ana@correo.com")).thenReturn(true);
 
-		assertThatThrownBy(() -> servicio.registrar(registro(Rol.HUESPED)))
+		UsuarioDTO datos = registro(Rol.HUESPED);
+
+		assertThatThrownBy(() -> servicio.registrar(datos))
 				.isInstanceOf(ReglaNegocioException.class)
 				.hasFieldOrPropertyWithValue("codigo", UsuarioService.CORREO_DUPLICADO);
 	}
@@ -110,7 +114,9 @@ class UsuarioServiceTest {
 		when(usuarioRepository.saveAndFlush(any(Usuario.class)))
 				.thenThrow(new DataIntegrityViolationException("email duplicado"));
 
-		assertThatThrownBy(() -> servicio.registrar(registro(Rol.HUESPED)))
+		UsuarioDTO datos = registro(Rol.HUESPED);
+
+		assertThatThrownBy(() -> servicio.registrar(datos))
 				.isInstanceOf(ReglaNegocioException.class);
 	}
 
