@@ -167,10 +167,17 @@ class UsuarioServiceTest {
 				.isInstanceOf(CredencialesInvalidasException.class);
 		assertThat(usuario.getIntentosFallidos()).isEqualTo((short) 1);
 
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < 3; i++) {
 			assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
 					.isInstanceOf(CredencialesInvalidasException.class);
 		}
+		// Con cuatro fallos todavía puede intentarlo
+		assertThat(usuario.estaBloqueadoTemporalmente(AHORA)).isFalse();
+
+		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
+				.isInstanceOf(CredencialesInvalidasException.class);
+		// El quinto fallo bloquea la cuenta
+		assertThat(usuario.estaBloqueadoTemporalmente(AHORA)).isTrue();
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
 				.isInstanceOf(CuentaBloqueadaTemporalmenteException.class);
 	}
