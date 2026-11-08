@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,7 +69,9 @@ class DisponibilidadServiceTest {
 	}
 
 	private void existe() {
-		when(alojamientoRepository.findById(10L)).thenReturn(Optional.of(alojamiento));
+		// Consultar usa findById; crear, editar y eliminar bloquean la fila con buscarParaActualizar
+		lenient().when(alojamientoRepository.findById(10L)).thenReturn(Optional.of(alojamiento));
+		lenient().when(alojamientoRepository.buscarParaActualizar(10L)).thenReturn(Optional.of(alojamiento));
 	}
 
 	private static PeriodoDisponibleDTO periodo(LocalDate inicio, LocalDate fin) {

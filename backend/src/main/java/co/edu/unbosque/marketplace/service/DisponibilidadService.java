@@ -195,8 +195,10 @@ public class DisponibilidadService {
 				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 	}
 
+	/** Para modificar la disponibilidad: bloquea el alojamiento (ver buscarParaActualizar). */
 	private Alojamiento buscarDelDueno(Usuario anfitrion, Long alojamientoId) {
-		Alojamiento alojamiento = buscarAlojamiento(alojamientoId);
+		Alojamiento alojamiento = alojamientoRepository.buscarParaActualizar(alojamientoId)
+				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 		if (!alojamiento.esDe(anfitrion.getId())) {
 			throw new AccesoDenegadoException("Solo el anfitrión dueño puede gestionar la disponibilidad.");
 		}
