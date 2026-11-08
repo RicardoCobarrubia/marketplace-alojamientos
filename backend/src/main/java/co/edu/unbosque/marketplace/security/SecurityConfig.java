@@ -70,6 +70,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login").permitAll()
 				.requestMatchers("/actuator/health/**").permitAll()
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/catalogos/**").permitAll()
 
 				// Administración — MA-49
 				.requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
