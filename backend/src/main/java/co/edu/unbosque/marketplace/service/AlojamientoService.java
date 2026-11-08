@@ -198,7 +198,7 @@ public class AlojamientoService {
 	@Transactional
 	public ServicioAdicionalDTO agregarServicioAdicional(Usuario anfitrion, Long alojamientoId,
 			ServicioAdicionalDTO solicitud) {
-		Alojamiento alojamiento = buscarDelDueno(anfitrion, alojamientoId);
+		Alojamiento alojamiento = buscarDelDuenoSinBloqueo(anfitrion, alojamientoId);
 		ServicioAdicional servicio = alojamiento.agregarServicioAdicional(solicitud.nombre(), solicitud.costo(),
 				solicitud.modalidad(), reloj.instant());
 		servicio = servicioAdicionalRepository.save(servicio);
@@ -265,7 +265,7 @@ public class AlojamientoService {
 	}
 
 	private ServicioAdicional buscarServicioAdicional(Usuario anfitrion, Long alojamientoId, Long servicioId) {
-		return buscarDelDueno(anfitrion, alojamientoId).buscarServicioAdicional(servicioId)
+		return buscarDelDuenoSinBloqueo(anfitrion, alojamientoId).buscarServicioAdicional(servicioId)
 				.filter(ServicioAdicional::isActivo)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El servicio adicional no existe."));
 	}
@@ -279,6 +279,15 @@ public class AlojamientoService {
 		Alojamiento alojamiento = buscar(alojamientoId);
 		if (!alojamiento.esDe(anfitrion.getId())) {
 			throw new AccesoDenegadoException("Solo el anfitrión dueño puede hacer esto.");
+		}
+		return alojamiento;
+	}
+
+	/** Para cambiar la oferta: un alojamiento BLOQUEADA no lo modifica el anfitrión (ADR-009). */
+	private Alojamiento buscarDelDuenoSinBloqueo(Usuario anfitrion, Long alojamientoId) {
+		Alojamiento alojamiento = buscarDelDueno(anfitrion, alojamientoId);
+		if (alojamiento.getEstado() == EstadoAlojamiento.BLOQUEADA) {
+			throw new AccesoDenegadoException("El alojamiento está bloqueado; no puedes modificarlo.");
 		}
 		return alojamiento;
 	}

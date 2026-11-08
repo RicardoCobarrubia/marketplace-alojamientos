@@ -154,6 +154,9 @@ class AlojamientoIntegrationTest {
 				.andExpect(jsonPath("$.errores.capacidad").exists())
 				.andExpect(jsonPath("$.errores.precioNoche").exists())
 				.andExpect(jsonPath("$.errores.imagenes").exists());
+		como(anfitrion, post("/api/alojamientos").content(alojamiento("Apto", 4, "250000", 0)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errores.imagenes").exists());
 
 		como(huesped, post("/api/alojamientos").content(alojamiento("Apto", 4, "250000", 2)))
 				.andExpect(status().isForbidden());
@@ -220,6 +223,16 @@ class AlojamientoIntegrationTest {
 				.andExpect(status().isNoContent());
 		como(anfitrion, get("/api/alojamientos/" + id))
 				.andExpect(jsonPath("$.serviciosAdicionales.length()").value(0));
+	}
+
+	@Test
+	void conElAlojamientoBloqueadoNoSeCambianLosServiciosAdicionales() throws Exception {
+		long id = crear(anfitrion);
+		jdbc.update("UPDATE alojamiento SET estado = 'BLOQUEADA' WHERE id = ?", id);
+
+		como(anfitrion, post("/api/alojamientos/" + id + "/servicios-adicionales")
+				.content("{\"nombre\":\"Desayuno\",\"costo\":30000,\"modalidad\":\"POR_NOCHE\"}"))
+				.andExpect(status().isForbidden());
 	}
 
 	// ─────────────────────────────────────────
