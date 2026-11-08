@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,13 +40,17 @@ class AutenticacionIntegrationTest {
 	private WebApplicationContext contexto;
 	@Autowired
 	private JdbcTemplate jdbc;
+	@Autowired
+	private CacheManager cacheManager;
 
 	private MockMvc mvc;
 
 	@BeforeEach
 	void preparar() {
 		mvc = MockMvcBuilders.webAppContextSetup(contexto).apply(springSecurity()).build();
-		jdbc.update("DELETE FROM usuario");
+		jdbc.execute("TRUNCATE TABLE usuario RESTART IDENTITY CASCADE");
+		// La caché de sesiones guarda usuarios por correo; se limpia para que no queden de otra prueba
+		cacheManager.getCacheNames().forEach(nombre -> cacheManager.getCache(nombre).clear());
 	}
 
 	private static String registro(String email, String rol) {

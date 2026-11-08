@@ -1,5 +1,7 @@
 package co.edu.unbosque.marketplace.exception;
 
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 
 /**
@@ -32,5 +34,10 @@ public abstract class ExcepcionMarketplace extends RuntimeException {
 
 	public String getTitulo() {
 		return titulo;
+	}
+
+	/** Datos extra que se agregan a la respuesta, por ejemplo la lista de campos faltantes. */
+	public Map<String, Object> getPropiedadesAdicionales() {
+		return Map.of();
 	}
 }

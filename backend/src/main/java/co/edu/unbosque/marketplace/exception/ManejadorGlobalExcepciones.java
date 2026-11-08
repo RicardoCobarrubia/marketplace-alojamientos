@@ -41,6 +41,7 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 	public ProblemDetail manejarExcepcionDeNegocio(ExcepcionMarketplace ex) {
 		ProblemDetail problema = crear(ex.getEstado(), ex.getTitulo(), ex.getMessage());
 		problema.setProperty(CODIGO, ex.getCodigo());
+		ex.getPropiedadesAdicionales().forEach(problema::setProperty);
 		return problema;
 	}
 
