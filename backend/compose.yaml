@@ -1,0 +1,27 @@
+# Servicios para desarrollo local.
+# Uso, desde la carpeta backend:  docker compose up -d
+# Toma DB_USERNAME y DB_PASSWORD del archivo .env
+# Los puertos solo se abren en este equipo (127.0.0.1), no en la red local.
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: marketplace
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+
+  # Servidor SMTP de prueba: captura los correos sin enviarlos.
+  # Bandeja web en http://localhost:8025
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  datos-postgres:

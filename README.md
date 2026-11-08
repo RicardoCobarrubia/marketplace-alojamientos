@@ -10,7 +10,7 @@ El MVP demuestra el flujo de punta a punta:
 
 ```
 marketplace-alojamientos/
-├── backend/     API REST · Java 21 · Spring Boot
+├── backend/     API REST · Java 21 · Spring Boot 4.1 (ver backend/README.md)
 ├── frontend/    Aplicación web · React
 ├── docs/        Documentación técnica que acompaña al código
 └── .github/     Plantilla de Pull Request y flujos de GitHub Actions
@@ -43,5 +43,5 @@ Las convenciones de ramas, commits y Pull Requests están en [CONTRIBUTING.md](C
 
 ## Enlaces
 
-- Jira: proyecto **MA**
+- Jira: [proyecto MA](https://unbosque-proyectosoftware2.atlassian.net/jira/software/projects/MA/boards/1/backlog)
 - Confluence: espacio del proyecto
