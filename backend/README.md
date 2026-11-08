@@ -35,7 +35,8 @@ Con la API arriba:
 ## Pruebas
 
 ```
-mvnw.cmd verify
+mvnw.cmd verify      (Windows)
+./mvnw verify        (Linux / macOS / Git Bash)
 ```
 
 Corre las pruebas y deja la cobertura en `target/site/jacoco/`. Las pruebas de integración levantan un PostgreSQL con Testcontainers, así que Docker debe estar abierto.

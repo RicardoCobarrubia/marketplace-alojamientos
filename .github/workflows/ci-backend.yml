@@ -29,8 +29,6 @@ jobs:
         working-directory: backend
 
     env:
-      # Token de SonarCloud guardado en Settings → Secrets and variables → Actions
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_PLUGIN: org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211
 
     steps:
@@ -51,10 +49,19 @@ jobs:
         # Las pruebas de integración usan Testcontainers; ubuntu-latest ya trae Docker
         run: ./mvnw -B -ntp verify
 
+      # El token de SonarCloud (Settings → Secrets and variables → Actions) solo se entrega
+      # a los dos pasos que lo usan; las pruebas y la compilación no lo ven.
+      - name: Verificar el token de SonarCloud
+        id: sonar
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: echo "disponible=$([ -n "$SONAR_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Análisis de SonarCloud
         # Si el secreto no existe (por ejemplo, en un PR desde un fork) se salta este paso
-        if: env.SONAR_TOKEN != ''
+        if: steps.sonar.outputs.disponible == 'true'
         env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./mvnw -B -ntp $SONAR_PLUGIN:sonar
 

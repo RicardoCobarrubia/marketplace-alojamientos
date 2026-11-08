@@ -5,8 +5,9 @@ language: es-ES
 reviews:
   profile: chill
   request_changes_workflow: false
-  # No modificar la descripción del PR: el resumen va en el comentario de revisión.
-  high_level_summary: false
+  # El resumen va en el comentario de revisión, no en la descripción del PR.
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
   poem: false
   review_status: true
   collapse_walkthrough: false
