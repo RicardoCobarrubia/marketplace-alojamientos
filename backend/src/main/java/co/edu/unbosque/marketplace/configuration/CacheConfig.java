@@ -10,10 +10,14 @@ import org.springframework.context.annotation.Configuration;
  * petición. El tiempo de vida está en {@code spring.cache.caffeine.spec}: como máximo 60 s,
  * que es lo que tarda en hacerse efectiva una revocación de sesión (ADR-010, ASR-08).
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableCaching
 public class CacheConfig {
 
 	/** Nombre de la caché de versiones de sesión, declarado en {@code spring.cache.cache-names}. */
 	public static final String VERSIONES_SESION = "versionesSesion";
+
+	CacheConfig() {
+		// Lo crea Spring
+	}
 }

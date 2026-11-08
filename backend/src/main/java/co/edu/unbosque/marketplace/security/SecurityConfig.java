@@ -40,10 +40,13 @@ public class SecurityConfig {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http,
-			CorsConfigurationSource corsConfigurationSource) throws Exception {
+			CorsConfigurationSource corsConfigurationSource) {
 		http
 			.cors(cors -> cors.configurationSource(corsConfigurationSource))
-			.csrf(AbstractHttpConfigurer::disable)
+			// CSRF solo aplica cuando el navegador envía la sesión sola (cookies). Aquí no hay
+			// cookies de sesión: el token viaja en el encabezado Authorization y lo pone el
+			// frontend a mano, así que una página ajena no puede usarlo.
+			.csrf(AbstractHttpConfigurer::disable) // NOSONAR: API sin estado con JWT en encabezado
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.formLogin(AbstractHttpConfigurer::disable)
 			.sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
