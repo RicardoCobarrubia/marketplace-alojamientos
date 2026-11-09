@@ -28,4 +28,13 @@ public interface AlojamientoRepository extends JpaRepository<Alojamiento, Long> 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select a from Alojamiento a where a.id = :id")
 	Optional<Alojamiento> buscarParaActualizar(@Param("id") Long id);
+
+	/**
+	 * Bloqueo compartido para reservar (MA-66): varias reservas del mismo alojamiento avanzan a
+	 * la vez, porque la restricción de exclusión decide cuál gana (ADR-003), pero ninguna puede
+	 * entrar mientras el anfitrión reduce o elimina un periodo ({@link #buscarParaActualizar}).
+	 */
+	@Lock(LockModeType.PESSIMISTIC_READ)
+	@Query("select a from Alojamiento a where a.id = :id")
+	Optional<Alojamiento> buscarParaReservar(@Param("id") Long id);
 }

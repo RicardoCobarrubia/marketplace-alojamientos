@@ -72,8 +72,9 @@ co.edu.unbosque.marketplace
 ├── alojamientos      publicación, estados, servicios adicionales y catálogos
 ├── disponibilidad    periodos disponibles y consulta de disponibilidad
 ├── cotizacion        costo de la estadía con su desglose y su configuración
-├── pagos             puerto PasarelaPagos y adaptadores (con la historia de reservas)
-└── notificaciones    puerto de correo y procesador del outbox (con la historia de reservas)
+├── reservas          solicitud, pago, reintentos y conciliación
+├── pagos             puerto PasarelaPagos, StripeAdapter y PasarelaSimulada
+└── notificaciones    eventos del outbox (la entrega va en su propia historia)
 ```
 
 | Capa | Qué va ahí | Puede usar |
