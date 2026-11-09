@@ -41,6 +41,24 @@ export function formatearMes(fecha: Date): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+const RELATIVO = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+
+/** "hace 2 horas", "ayer", "hace 3 días" a partir de una fecha ISO con hora. */
+export function formatearHace(isoConHora: string): string {
+  const segundos = (new Date(isoConHora).getTime() - Date.now()) / 1000;
+  const unidades: [Intl.RelativeTimeFormatUnit, number][] = [
+    ['year', 31536000],
+    ['month', 2592000],
+    ['day', 86400],
+    ['hour', 3600],
+    ['minute', 60],
+  ];
+  for (const [unidad, tamano] of unidades) {
+    if (Math.abs(segundos) >= tamano) return RELATIVO.format(Math.round(segundos / tamano), unidad);
+  }
+  return 'hace un momento';
+}
+
 /** Lee el valor de un campo numérico; devuelve NaN si está vacío o no es un número. */
 export function leerNumero(texto: string): number {
   const limpio = texto.trim();

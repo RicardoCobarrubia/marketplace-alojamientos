@@ -10,6 +10,9 @@ export const RUTAS = {
   disponibilidad: '/anfitrion/disponibilidad',
   reservasRecibidas: '/anfitrion/reservas',
   admin: '/admin',
+  adminPublicaciones: '/admin/publicaciones',
+  adminAlojamientos: '/admin/alojamientos',
+  adminCatalogos: '/admin/catalogos',
 } as const;
 
 export function rutaEditarAlojamiento(id: number): string {
@@ -18,6 +21,10 @@ export function rutaEditarAlojamiento(id: number): string {
 
 export function rutaDisponibilidad(alojamientoId: number): string {
   return `${RUTAS.disponibilidad}?alojamiento=${alojamientoId}`;
+}
+
+export function rutaDetallePublicacion(id: number): string {
+  return `${RUTAS.adminPublicaciones}/${id}`;
 }
 
 /** Página a la que llega cada rol después de iniciar sesión (RF-02). */

@@ -1,5 +1,11 @@
 import { Navigate, Route, Routes } from 'react-router';
 import { LayoutApp } from './components/LayoutApp';
+import AlojamientosAdminPage from './pages/admin/AlojamientosAdminPage';
+import CatalogosPage from './pages/admin/CatalogosPage';
+import DetallePublicacionPage from './pages/admin/DetallePublicacionPage';
+import LayoutAdmin from './pages/admin/LayoutAdmin';
+import PanelAdminPage from './pages/admin/PanelAdminPage';
+import RevisionPublicacionesPage from './pages/admin/RevisionPublicacionesPage';
 import DisponibilidadPage from './pages/anfitrion/disponibilidad/DisponibilidadPage';
 import FormularioAlojamientoPage from './pages/anfitrion/formulario/FormularioAlojamientoPage';
 import LayoutAnfitrion from './pages/anfitrion/LayoutAnfitrion';
@@ -40,8 +46,12 @@ export default function App() {
       </Route>
 
       <Route element={<RutaProtegida roles={['ADMINISTRADOR']} />}>
-        <Route path={RUTAS.admin} element={<LayoutApp />}>
-          <Route index element={<InicioProvisional />} />
+        <Route path={RUTAS.admin} element={<LayoutAdmin />}>
+          <Route index element={<PanelAdminPage />} />
+          <Route path="publicaciones" element={<RevisionPublicacionesPage />} />
+          <Route path="publicaciones/:id" element={<DetallePublicacionPage />} />
+          <Route path="alojamientos" element={<AlojamientosAdminPage />} />
+          <Route path="catalogos" element={<CatalogosPage />} />
         </Route>
       </Route>
 

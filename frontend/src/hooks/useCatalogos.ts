@@ -23,6 +23,11 @@ function cargarCatalogos(): Promise<Catalogos> {
   return cargaEnCurso;
 }
 
+/** Obliga a recargar los catálogos la próxima vez, por ejemplo después de que el admin agrega uno. */
+export function invalidarCatalogos(): void {
+  cargaEnCurso = null;
+}
+
 export function useCatalogos(): { catalogos: Catalogos | null; error: string | null } {
   const [estado, setEstado] = useState<{ catalogos: Catalogos | null; error: string | null }>({
     catalogos: null,
