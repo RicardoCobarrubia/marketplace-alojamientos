@@ -1,0 +1,124 @@
+.app {
+  min-height: 100vh;
+}
+
+.barra-superior {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 32px;
+  background: var(--color-superficie);
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.barra-superior__izquierda {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  min-width: 0;
+}
+
+.barra-superior__nav {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+}
+
+.nav-enlace {
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+  color: var(--color-texto-suave);
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-enlace:hover {
+  color: var(--color-texto);
+}
+
+.nav-enlace--activo {
+  border-bottom-color: var(--color-cafe);
+  color: var(--color-texto);
+}
+
+.barra-superior__derecha {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.barra-superior__nombre {
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-arena);
+  color: var(--color-cafe-oscuro);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.boton-icono {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-borde);
+  border-radius: 50%;
+  background: var(--color-superficie);
+  color: var(--color-texto-suave);
+  cursor: pointer;
+}
+
+.boton-icono:hover {
+  border-color: var(--color-borde-foco);
+  color: var(--color-texto);
+}
+
+.app__contenido {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 32px 64px;
+}
+
+@media (max-width: 900px) {
+  .barra-superior {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+  }
+
+  .barra-superior__izquierda {
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    width: 100%;
+  }
+
+  .barra-superior__derecha {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+  }
+
+  .barra-superior__nombre,
+  .barra-superior .layout-anfitrion__nuevo {
+    display: none;
+  }
+
+  .app__contenido {
+    padding: 28px 16px 48px;
+  }
+}

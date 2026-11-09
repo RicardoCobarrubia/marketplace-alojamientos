@@ -9,6 +9,7 @@ interface ProblemDetail {
   codigo?: string;
   correlationId?: string | null;
   errores?: Record<string, string>;
+  campos?: string[];
 }
 
 interface DatosApiError {
@@ -17,6 +18,7 @@ interface DatosApiError {
   mensaje: string;
   correlationId?: string | null;
   errores?: Record<string, string>;
+  campos?: string[];
 }
 
 /** Error de una petición a la API. `codigo` es el código estable que envía el backend. */
@@ -26,6 +28,8 @@ export class ApiError extends Error {
   readonly correlationId: string | null;
   /** Errores por campo cuando el backend responde DATOS_INVALIDOS. */
   readonly errores: Record<string, string>;
+  /** Campos que faltan cuando el backend responde INFORMACION_INCOMPLETA. */
+  readonly campos: string[];
 
   constructor(datos: DatosApiError) {
     super(datos.mensaje);
@@ -34,6 +38,7 @@ export class ApiError extends Error {
     this.codigo = datos.codigo;
     this.correlationId = datos.correlationId ?? null;
     this.errores = datos.errores ?? {};
+    this.campos = datos.campos ?? [];
   }
 
   static async desdeRespuesta(respuesta: Response): Promise<ApiError> {
@@ -49,6 +54,7 @@ export class ApiError extends Error {
       mensaje: problema.detail ?? 'Ocurrió un error inesperado. Intenta de nuevo.',
       correlationId: problema.correlationId ?? respuesta.headers.get('X-Correlation-Id'),
       errores: problema.errores,
+      campos: problema.campos,
     });
   }
 }

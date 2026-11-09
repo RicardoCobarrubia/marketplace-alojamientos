@@ -1,0 +1,15 @@
+.miniatura {
+  display: block;
+  flex-shrink: 0;
+  width: 56px;
+  height: 40px;
+  border-radius: var(--radio-sm);
+  object-fit: cover;
+}
+
+.miniatura--vacia {
+  display: grid;
+  place-items: center;
+  background: #dccfb9;
+  color: #b9a381;
+}
