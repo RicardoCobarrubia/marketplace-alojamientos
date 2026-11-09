@@ -1,0 +1,40 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo__insignia {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radio-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.logo__nombre {
+  font-family: var(--fuente-titulos);
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.logo--claro .logo__insignia {
+  background: var(--color-arena);
+  color: var(--color-cafe-oscuro);
+}
+
+.logo--claro .logo__nombre {
+  color: var(--color-crema);
+}
+
+.logo--oscuro .logo__insignia {
+  background: var(--color-cafe);
+  color: #fff;
+}
+
+.logo--oscuro .logo__nombre {
+  color: var(--color-texto);
+}
