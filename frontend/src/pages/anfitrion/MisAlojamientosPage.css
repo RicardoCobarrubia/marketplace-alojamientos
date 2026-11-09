@@ -1,0 +1,122 @@
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.tabla-alojamientos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.tabla-alojamientos th {
+  padding: 12px 16px;
+  background: #faf6ef;
+  border-bottom: 1px solid var(--color-borde);
+  color: var(--color-texto-suave);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.tabla-alojamientos th:first-child {
+  border-top-left-radius: var(--radio-lg);
+}
+
+.tabla-alojamientos th:last-child {
+  border-top-right-radius: var(--radio-lg);
+}
+
+.tabla-alojamientos td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-borde);
+  vertical-align: middle;
+}
+
+.tabla-alojamientos tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tabla-alojamientos__alojamiento {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tabla-alojamientos__titulo {
+  font-weight: 500;
+}
+
+.tabla-alojamientos__ciudad {
+  color: var(--color-texto-suave);
+  font-size: 0.78rem;
+}
+
+.tabla-alojamientos__motivo {
+  max-width: 240px;
+  margin-top: 4px;
+  color: var(--color-error);
+  font-size: 0.76rem;
+}
+
+.tabla-alojamientos__sin-resultados {
+  padding: 32px 16px !important;
+  color: var(--color-texto-suave);
+  text-align: center;
+}
+
+.acciones {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+
+.acciones--texto {
+  gap: 6px;
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+}
+
+/* ─── En pantallas pequeñas cada fila es una tarjeta ── */
+@media (max-width: 760px) {
+  .tabla-alojamientos thead {
+    display: none;
+  }
+
+  .tabla-alojamientos,
+  .tabla-alojamientos tbody,
+  .tabla-alojamientos tr,
+  .tabla-alojamientos td {
+    display: block;
+  }
+
+  .tabla-alojamientos tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-borde);
+  }
+
+  .tabla-alojamientos tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .tabla-alojamientos td {
+    padding: 6px 16px;
+    border-bottom: 0;
+  }
+
+  .tabla-alojamientos td:not(:first-child)::before {
+    content: attr(data-titulo);
+    display: block;
+    margin-bottom: 2px;
+    color: var(--color-texto-suave);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}

@@ -1,0 +1,34 @@
+.etiqueta-estado {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.etiqueta-estado--activa {
+  background: #e3efdc;
+  color: #3f6b2f;
+}
+
+.etiqueta-estado--pendiente_revision {
+  background: #f8e8c8;
+  color: #8a5a12;
+}
+
+.etiqueta-estado--borrador {
+  background: #ece3d3;
+  color: #6b5644;
+}
+
+.etiqueta-estado--pausada {
+  background: #e9e0cf;
+  color: #6b5644;
+}
+
+.etiqueta-estado--bloqueada {
+  background: #f6dcd6;
+  color: #9a3a2c;
+}
