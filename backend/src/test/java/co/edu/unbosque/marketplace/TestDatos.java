@@ -6,14 +6,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
-import co.edu.unbosque.marketplace.model.Alojamiento;
-import co.edu.unbosque.marketplace.model.Ciudad;
-import co.edu.unbosque.marketplace.model.DatosAlojamiento;
-import co.edu.unbosque.marketplace.model.PoliticaCancelacion;
-import co.edu.unbosque.marketplace.model.Servicio;
-import co.edu.unbosque.marketplace.model.TipoAlojamiento;
-import co.edu.unbosque.marketplace.model.Usuario;
-import co.edu.unbosque.marketplace.model.Usuario.Rol;
+import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
+import co.edu.unbosque.marketplace.alojamientos.dominio.Ciudad;
+import co.edu.unbosque.marketplace.alojamientos.dominio.DatosAlojamiento;
+import co.edu.unbosque.marketplace.alojamientos.dominio.PoliticaCancelacion;
+import co.edu.unbosque.marketplace.alojamientos.dominio.Servicio;
+import co.edu.unbosque.marketplace.alojamientos.dominio.TipoAlojamiento;
+import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
+import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
 
 /** Datos para pruebas unitarias. */
 public final class TestDatos {

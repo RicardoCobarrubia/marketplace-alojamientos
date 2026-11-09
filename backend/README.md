@@ -63,23 +63,25 @@ Ningún archivo `.properties` guarda contraseñas ni llaves.
 
 ## Estructura de paquetes
 
-Se mantiene la organización por capas de Software 1 y se agregan los paquetes de las decisiones de arquitectura.
+Monolito modular en capas (ADR-001): un paquete por módulo de Confluence y, dentro de cada uno, las cuatro capas. Las dependencias van siempre hacia abajo y solo pagos y notificaciones usan puertos y adaptadores.
 
-| Paquete | Capa | Qué va ahí |
+```
+co.edu.unbosque.marketplace
+├── comun             configuracion · excepcion · web (correlación y errores)
+├── usuarios          registro, inicio de sesión y perfil
+├── alojamientos      publicación, estados, servicios adicionales y catálogos
+├── disponibilidad    periodos disponibles y consulta de disponibilidad
+├── pagos             puerto PasarelaPagos y adaptadores (con la historia de reservas)
+└── notificaciones    puerto de correo y procesador del outbox (con la historia de reservas)
+```
+
+| Capa | Qué va ahí | Puede usar |
 |---|---|---|
-| `controller` | Presentación | Controladores REST (`ControladorReservas`...) |
-| `dto` | Presentación | Objetos de entrada y salida de la API |
-| `service` | Aplicación | Casos de uso y transacciones (`GestionReservas`) |
-| `model` | Dominio | Entidades JPA y `EstadoReserva` (State) |
-| `repository` | Infraestructura | Repositorios Spring Data JPA |
-| `pagos` | Infraestructura | Puerto `PasarelaPagos`, `StripeAdapter`, `SimuladorPagosAdapter` |
-| `correo` | Infraestructura | `CorreoAdapter` (SMTP) |
-| `outbox` | Infraestructura | `ProcesadorOutbox` |
-| `scheduling` | Infraestructura | `TareasProgramadas` |
-| `security` | Transversal | Spring Security, tokens, revocación de sesión |
-| `filter` | Transversal | `CorrelacionFilter` (id de correlación) |
-| `exception` | Transversal | Excepciones de negocio y `ManejadorGlobalExcepciones` |
-| `configuration` | Transversal | OpenAPI, caché, ModelMapper |
-| `util` | Transversal | Utilidades |
+| `presentacion` | Controladores REST | aplicación, dominio |
+| `aplicacion` | Servicios (casos de uso, transacciones) y DTO | dominio, infraestructura |
+| `dominio` | Entidades JPA, reglas del negocio y puertos | — |
+| `infraestructura` | Repositorios Spring Data, seguridad y adaptadores | dominio |
+
+Además, los módulos no pueden formar ciclos y `comun` no depende de ninguno. `ArquitecturaTest` (ArchUnit) comprueba estas reglas en cada pipeline, junto con la del ADR-006: el dominio y la aplicación no pueden importar el SDK de Stripe.
 
 El esquema de la base de datos lo crean las migraciones de Flyway en `src/main/resources/db/migration`.
