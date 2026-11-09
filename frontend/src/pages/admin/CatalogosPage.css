@@ -1,0 +1,47 @@
+.catalogos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.catalogo__total {
+  margin-left: 4px;
+  color: var(--color-texto-suave);
+  font-family: var(--fuente-texto);
+  font-size: 0.8rem;
+}
+
+.catalogo__lista {
+  display: grid;
+  max-height: 280px;
+  margin: 0 0 16px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 0.86rem;
+}
+
+.catalogo__lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.catalogo__secundario {
+  color: var(--color-texto-suave);
+  font-size: 0.74rem;
+  text-align: right;
+}
+
+.catalogo__formulario {
+  padding-top: 4px;
+}
+
+@media (max-width: 1100px) {
+  .catalogos {
+    grid-template-columns: 1fr;
+  }
+}

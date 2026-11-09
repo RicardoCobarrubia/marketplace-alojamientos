@@ -1,0 +1,64 @@
+.panel__metricas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.panel__metrica {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+}
+
+.panel__metrica-titulo {
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+}
+
+.panel__metrica-valor {
+  font-family: var(--fuente-titulos);
+  font-size: 1.9rem;
+  line-height: 1.2;
+}
+
+.panel__metrica-valor--destacada {
+  color: #b06a1f;
+}
+
+.panel__metrica-detalle {
+  color: var(--color-texto-suave);
+  font-size: 0.74rem;
+}
+
+.panel__pendiente {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: #faf6ef;
+  color: var(--color-texto);
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+
+.panel__pendiente:hover {
+  border-color: var(--color-borde-foco);
+}
+
+.panel__flecha {
+  margin-left: auto;
+}
+
+.panel__nota {
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .panel__metricas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
