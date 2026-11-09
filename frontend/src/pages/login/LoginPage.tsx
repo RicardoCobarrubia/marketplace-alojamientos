@@ -1,19 +1,20 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { CircleAlert, Eye, EyeOff, House, LoaderCircle, Lock, Mail } from 'lucide-react';
+import { CircleAlert, LoaderCircle, Lock, Mail } from 'lucide-react';
 import { ApiError } from '../../api/ApiError';
+import { mensajeParaUsuario } from '../../api/mensajes';
 import { useAuth } from '../../auth/useAuth';
+import { BotonVerContrasena } from '../../components/BotonVerContrasena';
 import { CampoTexto } from '../../components/CampoTexto';
-import { Logo } from '../../components/Logo';
+import { LayoutAutenticacion } from '../../components/LayoutAutenticacion';
 import { RUTAS } from '../../routes/rutas';
+import { FORMATO_CORREO } from '../../utils/validaciones';
 import './LoginPage.css';
 
 interface ErroresCampos {
   email?: string;
   password?: string;
 }
-
-const FORMATO_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validar(email: string, password: string): ErroresCampos {
   const errores: ErroresCampos = {};
@@ -25,17 +26,12 @@ function validar(email: string, password: string): ErroresCampos {
 
 /** Convierte el error del backend en mensajes para el formulario. */
 function interpretarError(error: unknown): { campos: ErroresCampos; general: string | null } {
-  if (!(error instanceof ApiError)) {
-    return { campos: {}, general: 'Ocurrió un error inesperado. Intenta de nuevo.' };
-  }
-  if (error.codigo === 'DATOS_INVALIDOS') {
+  if (error instanceof ApiError && error.codigo === 'DATOS_INVALIDOS') {
     return { campos: { email: error.errores.email, password: error.errores.password }, general: null };
   }
   // CREDENCIALES_INVALIDAS, CUENTA_RESTRINGIDA, CUENTA_DESACTIVADA y CUENTA_BLOQUEADA_TEMPORALMENTE
-  // traen un mensaje pensado para el usuario. En errores del servidor se agrega el id de
-  // correlación para poder rastrearlo en los logs (ADR-012).
-  const seguimiento = error.status >= 500 && error.correlationId ? ` Código de seguimiento: ${error.correlationId}.` : '';
-  return { campos: {}, general: error.message + seguimiento };
+  // traen un mensaje pensado para el usuario.
+  return { campos: {}, general: mensajeParaUsuario(error) };
 }
 
 export default function LoginPage() {
@@ -69,97 +65,62 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login">
-      <aside className="login__panel">
-        <Logo variante="claro" />
-        <div className="login__panel-contenido">
-          <h1 className="login__titulo-panel">Encuentra tu próxima estancia en la región.</h1>
-          <p className="login__subtitulo-panel">
-            Alojamientos temporales verificados, con disponibilidad en tiempo real y reservas sin duplicados.
-          </p>
-        </div>
-        <div className="login__mosaico" aria-hidden="true">
-          <span className="login__tesela login__tesela--1">
-            <House size={22} strokeWidth={1.5} />
-          </span>
-          <span className="login__tesela login__tesela--2">
-            <House size={22} strokeWidth={1.5} />
-          </span>
-          <span className="login__tesela login__tesela--3">
-            <House size={22} strokeWidth={1.5} />
-          </span>
-        </div>
-      </aside>
+    <LayoutAutenticacion>
+      <h2 className="autenticacion__titulo">Bienvenido de nuevo</h2>
+      <p className="autenticacion__instruccion">Ingresa con tu correo para continuar.</p>
 
-      <main className="login__zona-formulario">
-        <div className="login__tarjeta">
-          <h2 className="login__titulo">Bienvenido de nuevo</h2>
-          <p className="login__instruccion">Ingresa con tu correo para continuar.</p>
+      <form onSubmit={manejarEnvio} noValidate>
+        {errorGeneral && (
+          <div className="alerta alerta--error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
+            <span>{errorGeneral}</span>
+          </div>
+        )}
 
-          <form onSubmit={manejarEnvio} noValidate>
-            {errorGeneral && (
-              <div className="alerta alerta--error" role="alert">
-                <CircleAlert size={16} aria-hidden="true" />
-                <span>{errorGeneral}</span>
-              </div>
-            )}
+        <CampoTexto
+          etiqueta="Correo electrónico"
+          icono={Mail}
+          type="email"
+          name="email"
+          autoComplete="email"
+          placeholder="tu@correo.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={errores.email}
+          disabled={enviando}
+          autoFocus
+        />
 
-            <CampoTexto
-              etiqueta="Correo electrónico"
-              icono={Mail}
-              type="email"
-              name="email"
-              autoComplete="email"
-              placeholder="tu@correo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              error={errores.email}
-              disabled={enviando}
-              autoFocus
-            />
+        <CampoTexto
+          etiqueta="Contraseña"
+          icono={Lock}
+          type={verPassword ? 'text' : 'password'}
+          name="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={errores.password}
+          disabled={enviando}
+          accesorio={<BotonVerContrasena visible={verPassword} alCambiar={() => setVerPassword((v) => !v)} />}
+        />
 
-            <CampoTexto
-              etiqueta="Contraseña"
-              icono={Lock}
-              type={verPassword ? 'text' : 'password'}
-              name="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={errores.password}
-              disabled={enviando}
-              accesorio={
-                <button
-                  type="button"
-                  className="campo__accesorio"
-                  onClick={() => setVerPassword((v) => !v)}
-                  aria-label={verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  aria-pressed={verPassword}
-                >
-                  {verPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              }
-            />
+        <Link to={RUTAS.recuperarContrasena} className="enlace login__olvido">
+          ¿Olvidaste tu contraseña?
+        </Link>
 
-            <Link to={RUTAS.recuperarContrasena} className="enlace login__olvido">
-              ¿Olvidaste tu contraseña?
-            </Link>
+        <button type="submit" className="boton boton--primario boton--bloque" disabled={enviando}>
+          {enviando && <LoaderCircle size={16} className="girando" aria-hidden="true" />}
+          {enviando ? 'Iniciando sesión…' : 'Iniciar sesión'}
+        </button>
+      </form>
 
-            <button type="submit" className="boton boton--primario boton--bloque" disabled={enviando}>
-              {enviando && <LoaderCircle size={16} className="girando" aria-hidden="true" />}
-              {enviando ? 'Iniciando sesión…' : 'Iniciar sesión'}
-            </button>
-          </form>
-
-          <p className="login__registro">
-            ¿No tienes cuenta?{' '}
-            <Link to={RUTAS.registro} className="enlace">
-              Regístrate
-            </Link>
-          </p>
-        </div>
-      </main>
-    </div>
+      <p className="autenticacion__pie">
+        ¿No tienes cuenta?{' '}
+        <Link to={RUTAS.registro} className="enlace">
+          Regístrate
+        </Link>
+      </p>
+    </LayoutAutenticacion>
   );
 }

@@ -13,6 +13,18 @@ export interface Usuario {
   estadoCuenta: EstadoCuenta;
 }
 
+/** Roles que se pueden elegir al registrarse: el administrador no se registra (MA-47). */
+export type RolRegistro = Exclude<Rol, 'ADMINISTRADOR'>;
+
+/** Cuerpo de POST /api/auth/registro. */
+export interface DatosRegistro {
+  nombre: string;
+  email: string;
+  telefono: string;
+  password: string;
+  rol: RolRegistro;
+}
+
 export interface Credenciales {
   email: string;
   password: string;

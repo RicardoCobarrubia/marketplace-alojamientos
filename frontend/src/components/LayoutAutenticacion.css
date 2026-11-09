@@ -1,0 +1,126 @@
+.autenticacion {
+  display: grid;
+  grid-template-columns: minmax(360px, 39%) 1fr;
+  min-height: 100vh;
+  background: var(--color-fondo);
+}
+
+/* ─── Panel izquierdo ─────────────────────────────────── */
+.autenticacion__panel {
+  display: flex;
+  flex-direction: column;
+  padding: 40px 56px 48px;
+  background: var(--color-cafe-oscuro);
+  color: var(--color-crema);
+}
+
+.autenticacion__panel-contenido {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.autenticacion__titulo-panel {
+  max-width: 14em;
+  margin: 0 0 16px;
+  color: var(--color-crema);
+  font-size: clamp(2rem, 2.6vw, 2.6rem);
+  line-height: 1.2;
+}
+
+.autenticacion__subtitulo-panel {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--color-texto-sobre-oscuro);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.autenticacion__mosaico {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.autenticacion__tesela {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 2;
+  border-radius: var(--radio);
+}
+
+.autenticacion__tesela--1 {
+  background: #6e5443;
+  color: #cdb89c;
+}
+
+.autenticacion__tesela--2 {
+  background: #cdbb9d;
+  color: #b19b78;
+}
+
+.autenticacion__tesela--3 {
+  background: #dccfb9;
+  color: #bfac8d;
+}
+
+/* ─── Zona del formulario ─────────────────────────────── */
+.autenticacion__zona-formulario {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.autenticacion__tarjeta {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Textos comunes de los formularios de acceso */
+.autenticacion__titulo {
+  margin: 0 0 8px;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.autenticacion__instruccion {
+  margin: 0 0 28px;
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
+}
+
+.autenticacion__pie {
+  margin: 20px 0 0;
+  color: var(--color-texto-suave);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+/* ─── Pantallas pequeñas: el panel queda como franja superior ── */
+@media (max-width: 900px) {
+  .autenticacion {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .autenticacion__panel {
+    padding: 18px 16px;
+  }
+
+  .autenticacion__panel-contenido,
+  .autenticacion__mosaico {
+    display: none;
+  }
+
+  .autenticacion__zona-formulario {
+    align-items: flex-start;
+    padding: 40px 16px;
+  }
+
+  .autenticacion__titulo {
+    font-size: 1.7rem;
+  }
+}

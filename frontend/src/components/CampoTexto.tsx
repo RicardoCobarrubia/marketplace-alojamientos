@@ -5,14 +5,17 @@ interface PropiedadesCampoTexto extends InputHTMLAttributes<HTMLInputElement> {
   etiqueta: string;
   icono?: LucideIcon;
   error?: string;
+  /** Texto de ayuda debajo del campo; se reemplaza por el error cuando hay uno. */
+  ayuda?: string;
   /** Elemento al final del campo, por ejemplo el botón para ver la contraseña. */
   accesorio?: ReactNode;
 }
 
-export function CampoTexto({ etiqueta, icono: Icono, error, accesorio, id, ...resto }: PropiedadesCampoTexto) {
+export function CampoTexto({ etiqueta, icono: Icono, error, ayuda, accesorio, id, ...resto }: PropiedadesCampoTexto) {
   const idGenerado = useId();
   const idCampo = id ?? idGenerado;
-  const idError = `${idCampo}-error`;
+  const idMensaje = `${idCampo}-mensaje`;
+  const mensaje = error ?? ayuda;
 
   return (
     <div className="campo">
@@ -25,14 +28,14 @@ export function CampoTexto({ etiqueta, icono: Icono, error, accesorio, id, ...re
           id={idCampo}
           className="campo__input"
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? idError : undefined}
+          aria-describedby={mensaje ? idMensaje : undefined}
           {...resto}
         />
         {accesorio}
       </div>
-      {error && (
-        <p id={idError} className="campo__error">
-          {error}
+      {mensaje && (
+        <p id={idMensaje} className={error ? 'campo__error' : 'campo__ayuda'}>
+          {mensaje}
         </p>
       )}
     </div>

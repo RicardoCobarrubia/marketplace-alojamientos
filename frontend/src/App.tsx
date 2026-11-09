@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router';
 import LoginPage from './pages/login/LoginPage';
 import InicioProvisional from './pages/provisionales/InicioProvisional';
 import PaginaPendiente from './pages/provisionales/PaginaPendiente';
+import RegistroPage from './pages/registro/RegistroPage';
 import { RedireccionInicial, RutaProtegida, SoloInvitados } from './routes/Guardias';
 import { RUTAS } from './routes/rutas';
 
@@ -12,7 +13,7 @@ export default function App() {
 
       <Route element={<SoloInvitados />}>
         <Route path={RUTAS.login} element={<LoginPage />} />
-        <Route path={RUTAS.registro} element={<PaginaPendiente titulo="Crear cuenta" />} />
+        <Route path={RUTAS.registro} element={<RegistroPage />} />
         <Route path={RUTAS.recuperarContrasena} element={<PaginaPendiente titulo="Recuperar contraseña" />} />
       </Route>
 
