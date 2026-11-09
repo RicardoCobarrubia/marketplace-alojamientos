@@ -71,6 +71,7 @@ co.edu.unbosque.marketplace
 ├── usuarios          registro, inicio de sesión y perfil
 ├── alojamientos      publicación, estados, servicios adicionales y catálogos
 ├── disponibilidad    periodos disponibles y consulta de disponibilidad
+├── cotizacion        costo de la estadía con su desglose y su configuración
 ├── pagos             puerto PasarelaPagos y adaptadores (con la historia de reservas)
 └── notificaciones    puerto de correo y procesador del outbox (con la historia de reservas)
 ```

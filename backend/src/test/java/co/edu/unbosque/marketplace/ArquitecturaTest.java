@@ -46,7 +46,8 @@ class ArquitecturaTest {
 			.that().resideInAPackage("..marketplace.comun..")
 			.should().dependOnClassesThat().resideInAnyPackage(
 					"..marketplace.usuarios..", "..marketplace.alojamientos..",
-					"..marketplace.disponibilidad..", "..marketplace.pagos..",
+					"..marketplace.disponibilidad..", "..marketplace.cotizacion..",
+					"..marketplace.reservas..", "..marketplace.pagos..",
 					"..marketplace.notificaciones..");
 
 	/**
