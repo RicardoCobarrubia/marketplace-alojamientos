@@ -16,7 +16,7 @@ marketplace-alojamientos/
 └── .github/     Plantilla de Pull Request y flujos de GitHub Actions
 ```
 
-La documentación de ingeniería (requerimientos, casos de uso, ASR, ADR, diagramas) vive en Confluence.
+La documentación de ingeniería (requerimientos, casos de uso, ASR, ADR, diagramas) vive dentro de Confluence.
 
 ## Arquitectura
 
