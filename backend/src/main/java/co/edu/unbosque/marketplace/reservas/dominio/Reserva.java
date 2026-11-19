@@ -127,6 +127,10 @@ public class Reserva {
 	@Column(name = "pago_por_verificar", nullable = false)
 	private boolean pagoPorVerificar;
 
+	/** Intentos de devolución hechos; cada uno usa su propia clave de idempotencia. */
+	@Column(name = "intentos_devolucion", nullable = false)
+	private int intentosDevolucion;
+
 	@Column(name = "correlation_id", length = 100, updatable = false)
 	private String correlationId;
 
@@ -175,6 +179,23 @@ public class Reserva {
 	// Transiciones — MA-67, MA-68
 	// ─────────────────────────────────────────
 
+	/**
+	 * Guarda la referencia del cobro preparado antes de cobrar (ADR-004): así el estado real
+	 * siempre se puede consultar por referencia.
+	 */
+	public void registrarReferencia(String referenciaPago, Instant ahora) {
+		if (estado == EstadoReserva.PENDIENTE_PAGO && this.referenciaPago == null) {
+			this.referenciaPago = referenciaPago;
+			this.actualizadoEn = ahora;
+		}
+	}
+
+	/** Cuenta un nuevo intento de devolución y devuelve su número (1, 2, 3...). */
+	public int siguienteIntentoDevolucion(Instant ahora) {
+		this.actualizadoEn = ahora;
+		return ++intentosDevolucion;
+	}
+
 	/** El pago se aprobó: PENDIENTE_PAGO → CONFIRMADA. */
 	public void confirmar(String referenciaPago, Instant ahora) {
 		cambiarEstado(EstadoReserva.CONFIRMADA, ahora);
@@ -190,7 +211,9 @@ public class Reserva {
 	public void marcarPagoFallido(String motivo, String referenciaPago, boolean porVerificar, Instant ahora) {
 		cambiarEstado(EstadoReserva.PAGO_FALLIDO, ahora);
 		this.motivoFallo = motivo;
-		this.referenciaPago = referenciaPago;
+		if (referenciaPago != null) {
+			this.referenciaPago = referenciaPago;
+		}
 		this.pagoPorVerificar = porVerificar;
 	}
 
@@ -311,6 +334,10 @@ public class Reserva {
 
 	public String getMotivoFallo() {
 		return motivoFallo;
+	}
+
+	public int getIntentosDevolucion() {
+		return intentosDevolucion;
 	}
 
 	public boolean isPagoPorVerificar() {

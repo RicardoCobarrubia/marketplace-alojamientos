@@ -266,7 +266,22 @@ class ReservaIntegrationTest {
 				.andExpect(jsonPath("$.codigo").value("PASARELA_SIN_RESPUESTA"));
 
 		assertThat(pasarela.devoluciones()).isEqualTo(1);
-		assertThat(contar("SELECT count(*) FROM reserva WHERE estado = 'PAGO_FALLIDO'")).isEqualTo(1);
+		assertThat(contar("SELECT count(*) FROM reserva WHERE estado = 'PAGO_FALLIDO'"
+				+ " AND referencia_pago IS NOT NULL AND intentos_devolucion = 1")).isEqualTo(1);
+		disponibilidad().andExpect(jsonPath("$.disponible").value(true));
+	}
+
+	@Test
+	void siLaPasarelaNoRespondeAlPrepararNoHayCobroNiDudas() throws Exception {
+		pasarela.modo(Modo.SIN_CONEXION);
+
+		reservar(huesped, "intento-1", LLEGADA, SALIDA, 2)
+				.andExpect(status().isGatewayTimeout())
+				.andExpect(jsonPath("$.codigo").value("PASARELA_SIN_RESPUESTA"));
+
+		assertThat(contar("SELECT count(*) FROM reserva WHERE estado = 'PAGO_FALLIDO'"
+				+ " AND referencia_pago IS NULL AND NOT pago_por_verificar")).isEqualTo(1);
+		assertThat(pasarela.llamadasCobro()).isZero();
 		disponibilidad().andExpect(jsonPath("$.disponible").value(true));
 	}
 
@@ -274,7 +289,8 @@ class ReservaIntegrationTest {
 	void siLaPasarelaEstaCaidaElConciliadorVerificaDespues() throws Exception {
 		pasarela.modo(Modo.CAIDA);
 		reservar(huesped, "intento-1", LLEGADA, SALIDA, 2).andExpect(status().isGatewayTimeout());
-		assertThat(contar("SELECT count(*) FROM reserva WHERE pago_por_verificar")).isEqualTo(1);
+		assertThat(contar("SELECT count(*) FROM reserva WHERE pago_por_verificar AND referencia_pago IS NOT NULL"))
+				.isEqualTo(1);
 
 		pasarela.modo(Modo.APROBAR);
 		assertThat(conciliador.verificarPagosEnDuda()).isEqualTo(1);

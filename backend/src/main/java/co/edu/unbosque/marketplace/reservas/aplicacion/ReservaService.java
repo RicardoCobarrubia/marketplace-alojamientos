@@ -50,6 +50,7 @@ public class ReservaService {
 	private static final Logger log = LoggerFactory.getLogger(ReservaService.class);
 	private static final int MAXIMO_CLAVE = 100;
 	private static final String SIN_RESPUESTA = "PASARELA_SIN_RESPUESTA";
+	private static final String DETALLE_SIN_RESPUESTA = "La pasarela de pagos no respondió a tiempo.";
 	private static final String RETENCION_VENCIDA = "RETENCION_VENCIDA";
 	private static final String DETALLE_RETENCION_VENCIDA = "La retención de las fechas venció sin confirmar el pago.";
 
@@ -94,14 +95,27 @@ public class ReservaService {
 		return cobrar(reserva.getId(), reserva.getTotal());
 	}
 
+	/**
+	 * Prepara el cobro, guarda su referencia y cobra (ADR-004). Si la pasarela no responde al
+	 * preparar, no se cobró nada: se compensa sin dudas.
+	 */
 	private RespuestaReserva cobrar(Long reservaId, BigDecimal total) {
-		String clavePago = clavePago(reservaId);
+		SolicitudCobro solicitud = new SolicitudCobro(clavePago(reservaId), total, "Reserva " + reservaId);
+		String referencia;
+		try {
+			referencia = pasarela.preparar(solicitud);
+		} catch (PasarelaNoDisponibleException e) {
+			log.warn("La pasarela no respondió al preparar el cobro de la reserva {}: {}", reservaId, e.getMessage());
+			return transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA,
+					DETALLE_SIN_RESPUESTA, null, false, false).respuesta();
+		}
+		transacciones.registrarReferencia(reservaId, referencia);
 		ResultadoPago resultado;
 		try {
-			resultado = pasarela.cobrar(new SolicitudCobro(clavePago, total, "Reserva " + reservaId));
+			resultado = pasarela.cobrar(referencia, solicitud);
 		} catch (PasarelaNoDisponibleException e) {
 			log.warn("La pasarela no respondió al cobrar la reserva {}: {}", reservaId, e.getMessage());
-			return resolverSinRespuesta(reservaId, total, "La pasarela de pagos no respondió a tiempo.");
+			return resolverSinRespuesta(reservaId, referencia, total);
 		}
 		return aplicar(reservaId, total, resultado);
 	}
@@ -121,31 +135,34 @@ public class ReservaService {
 	}
 
 	/**
-	 * SD-03: la pasarela no respondió. Se consulta el estado real con la misma clave; si sí cobró,
-	 * se pide la devolución antes de compensar. Si tampoco responde la consulta, la reserva queda
-	 * marcada para que el conciliador lo revise después.
+	 * SD-03: la pasarela no respondió al cobrar. Se consulta el estado real por la referencia; si
+	 * sí cobró, se pide la devolución. Si dice que no, la reserva queda por verificar una vez más,
+	 * por si el cobro todavía se estaba procesando; si tampoco responde, el conciliador lo revisa.
 	 */
-	private RespuestaReserva resolverSinRespuesta(Long reservaId, BigDecimal total, String detalle) {
-		String clavePago = clavePago(reservaId);
+	private RespuestaReserva resolverSinRespuesta(Long reservaId, String referencia, BigDecimal total) {
 		ResultadoPago real;
 		try {
-			real = pasarela.consultar(clavePago, total);
+			real = pasarela.consultar(referencia);
 		} catch (PasarelaNoDisponibleException e) {
-			return transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA, detalle,
-					null, true, false).respuesta();
+			return transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA,
+					DETALLE_SIN_RESPUESTA, null, true, false).respuesta();
 		}
 		Desenlace desenlace = transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA,
-				detalle, real.referencia(), false, real.aprobado());
+				DETALLE_SIN_RESPUESTA, null, !real.aprobado(), real.aprobado());
 		if (desenlace.requiereDevolucion()) {
-			devolver(reservaId, real.referencia(), total);
+			devolver(reservaId, referencia, total);
 		}
 		return desenlace.respuesta();
 	}
 
-	/** MA-68, escenario 2. Si la devolución falla, el conciliador la reintenta con la misma clave. */
+	/**
+	 * MA-68, escenario 2. Cada intento se cuenta antes de llamar a la pasarela, así un reintento
+	 * usa una clave nueva. Si falla, la reserva queda por verificar y el conciliador lo reintenta.
+	 */
 	private void devolver(Long reservaId, String referencia, BigDecimal total) {
 		try {
-			pasarela.devolver(referencia, total, clavePago(reservaId));
+			int intento = transacciones.siguienteIntentoDevolucion(reservaId);
+			pasarela.devolver(referencia, total, clavePago(reservaId), intento);
 			log.info("Devolución solicitada para la reserva {}", reservaId);
 			transacciones.marcarPagoVerificado(reservaId, referencia);
 		} catch (PasarelaNoDisponibleException e) {
@@ -190,22 +207,26 @@ public class ReservaService {
 
 	/**
 	 * Retoma una reserva que quedó en PENDIENTE_PAGO: si el cobro se hizo, la confirma; si no,
-	 * la compensa. La usan el reintento y el conciliador.
+	 * la compensa. La usa el reintento (ADR-002).
 	 */
 	RespuestaReserva recuperar(Reserva reserva) {
 		Long reservaId = reserva.getId();
-		BigDecimal total = reserva.getTotal();
+		if (reserva.getReferenciaPago() == null) {
+			// Nunca llegó a cobrarse: sin referencia no hay cobro
+			return transacciones.compensar(reservaId, HttpStatus.PAYMENT_REQUIRED, "PAGO_NO_REALIZADO",
+					"El pago no se completó.", null, false, false).respuesta();
+		}
 		ResultadoPago real;
 		try {
-			real = pasarela.consultar(clavePago(reservaId), total);
+			real = pasarela.consultar(reserva.getReferenciaPago());
 		} catch (PasarelaNoDisponibleException e) {
 			return transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA,
 					"No se pudo confirmar el pago con la pasarela.", null, true, false).respuesta();
 		}
 		if (real.aprobado()) {
-			return aplicar(reservaId, total, real);
+			return aplicar(reservaId, reserva.getTotal(), real);
 		}
-		// Queda por verificar: si el intento original todavía estaba por cobrar, el conciliador
+		// Queda por verificar: si el intento original todavía estaba cobrando, el conciliador
 		// encontrará ese cobro tardío y lo devolverá
 		return transacciones.compensar(reservaId, HttpStatus.PAYMENT_REQUIRED, "PAGO_NO_REALIZADO",
 				"El pago no se completó.", null, true, false).respuesta();
@@ -217,10 +238,15 @@ public class ReservaService {
 	 */
 	void vencer(Reserva reserva) {
 		Long reservaId = reserva.getId();
-		BigDecimal total = reserva.getTotal();
+		String referencia = reserva.getReferenciaPago();
+		if (referencia == null) {
+			transacciones.compensar(reservaId, HttpStatus.CONFLICT, RETENCION_VENCIDA, DETALLE_RETENCION_VENCIDA,
+					null, false, false);
+			return;
+		}
 		ResultadoPago real;
 		try {
-			real = pasarela.consultar(clavePago(reservaId), total);
+			real = pasarela.consultar(referencia);
 		} catch (PasarelaNoDisponibleException e) {
 			transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, RETENCION_VENCIDA,
 					DETALLE_RETENCION_VENCIDA, null, true, false);
@@ -228,20 +254,27 @@ public class ReservaService {
 		}
 		// Si mientras tanto otro flujo la confirmó, compensar no cambia nada y no se devuelve
 		Desenlace desenlace = transacciones.compensar(reservaId, HttpStatus.CONFLICT, RETENCION_VENCIDA,
-				DETALLE_RETENCION_VENCIDA, real.referencia(), !real.aprobado(), real.aprobado());
+				DETALLE_RETENCION_VENCIDA, null, !real.aprobado(), real.aprobado());
 		if (desenlace.requiereDevolucion()) {
-			devolver(reservaId, real.referencia(), total);
+			devolver(reservaId, referencia, reserva.getTotal());
 		}
 	}
 
 	/** Un pago quedó en duda: si hubo cobro, se pide la devolución (MA-68, escenario 3). */
 	void verificarPago(Reserva reserva) {
-		ResultadoPago real = pasarela.consultar(clavePago(reserva.getId()), reserva.getTotal());
+		String referencia = reserva.getReferenciaPago();
+		if (referencia == null) {
+			// Sin referencia nunca se cobró
+			transacciones.marcarPagoVerificado(reserva.getId(), null);
+			return;
+		}
+		ResultadoPago real = pasarela.consultar(referencia);
 		if (real.aprobado() && reserva.getEstado() != EstadoReserva.CONFIRMADA) {
-			pasarela.devolver(real.referencia(), reserva.getTotal(), clavePago(reserva.getId()));
+			int intento = transacciones.siguienteIntentoDevolucion(reserva.getId());
+			pasarela.devolver(referencia, reserva.getTotal(), clavePago(reserva.getId()), intento);
 			log.info("Devolución solicitada para la reserva {} (pago verificado)", reserva.getId());
 		}
-		transacciones.marcarPagoVerificado(reserva.getId(), real.referencia());
+		transacciones.marcarPagoVerificado(reserva.getId(), referencia);
 	}
 
 	// ─────────────────────────────────────────

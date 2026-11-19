@@ -18,16 +18,19 @@ public class PasarelaDePrueba implements PasarelaPagos {
 	public enum Modo {
 		APROBAR,
 		RECHAZAR,
-		/** No responde y no alcanzó a cobrar. */
+		/** No responde al preparar: nunca hubo cobro. */
+		SIN_CONEXION,
+		/** Prepara, pero no responde al cobrar y no alcanzó a cobrar. */
 		TIMEOUT_SIN_COBRO,
-		/** No responde, pero sí cobró. */
+		/** Prepara, no responde al cobrar, pero sí cobró. */
 		TIMEOUT_COBRADO,
-		/** No responde a nada, ni siquiera a la consulta. */
+		/** Prepara, y después no responde a nada, ni siquiera a la consulta. */
 		CAIDA
 	}
 
 	private volatile Modo modo = Modo.APROBAR;
-	private final Map<String, String> cobros = new ConcurrentHashMap<>();
+	private final Map<String, String> preparados = new ConcurrentHashMap<>();
+	private final Set<String> cobrados = ConcurrentHashMap.newKeySet();
 	private final Set<String> devoluciones = ConcurrentHashMap.newKeySet();
 	private final AtomicInteger llamadasCobro = new AtomicInteger();
 
@@ -37,13 +40,14 @@ public class PasarelaDePrueba implements PasarelaPagos {
 
 	public void reiniciar() {
 		modo = Modo.APROBAR;
-		cobros.clear();
+		preparados.clear();
+		cobrados.clear();
 		devoluciones.clear();
 		llamadasCobro.set(0);
 	}
 
 	public int cobros() {
-		return cobros.size();
+		return cobrados.size();
 	}
 
 	public int llamadasCobro() {
@@ -55,37 +59,43 @@ public class PasarelaDePrueba implements PasarelaPagos {
 	}
 
 	@Override
-	public ResultadoPago cobrar(SolicitudCobro solicitud) {
+	public String preparar(SolicitudCobro solicitud) {
+		if (modo == Modo.SIN_CONEXION) {
+			throw new PasarelaNoDisponibleException("Sin conexión simulada");
+		}
+		return preparados.computeIfAbsent(solicitud.claveIdempotencia(), c -> "prueba_" + UUID.randomUUID());
+	}
+
+	@Override
+	public ResultadoPago cobrar(String referencia, SolicitudCobro solicitud) {
 		llamadasCobro.incrementAndGet();
 		return switch (modo) {
-			case APROBAR -> ResultadoPago.aprobado(cobrarUnaVez(solicitud.claveIdempotencia()));
-			case RECHAZAR -> ResultadoPago.rechazado(null, "Fondos insuficientes");
+			case APROBAR -> {
+				cobrados.add(referencia);
+				yield ResultadoPago.aprobado(referencia);
+			}
+			case RECHAZAR -> ResultadoPago.rechazado(referencia, "Fondos insuficientes");
 			case TIMEOUT_COBRADO -> {
-				cobrarUnaVez(solicitud.claveIdempotencia());
+				cobrados.add(referencia);
 				throw new PasarelaNoDisponibleException("Timeout simulado");
 			}
-			case TIMEOUT_SIN_COBRO, CAIDA -> throw new PasarelaNoDisponibleException("Timeout simulado");
+			case SIN_CONEXION, TIMEOUT_SIN_COBRO, CAIDA -> throw new PasarelaNoDisponibleException("Timeout simulado");
 		};
 	}
 
 	@Override
-	public ResultadoPago consultar(String claveIdempotencia, BigDecimal monto) {
-		if (modo == Modo.CAIDA) {
+	public ResultadoPago consultar(String referencia) {
+		if (modo == Modo.CAIDA || modo == Modo.SIN_CONEXION) {
 			throw new PasarelaNoDisponibleException("Caída simulada");
 		}
-		String referencia = cobros.get(claveIdempotencia);
-		return referencia != null ? ResultadoPago.aprobado(referencia) : ResultadoPago.noCobrado();
+		return cobrados.contains(referencia) ? ResultadoPago.aprobado(referencia) : ResultadoPago.noCobrado();
 	}
 
 	@Override
-	public void devolver(String referencia, BigDecimal monto, String claveIdempotencia) {
-		if (modo == Modo.CAIDA) {
+	public void devolver(String referencia, BigDecimal monto, String claveIdempotencia, int intento) {
+		if (modo == Modo.CAIDA || modo == Modo.SIN_CONEXION) {
 			throw new PasarelaNoDisponibleException("Caída simulada");
 		}
-		devoluciones.add(claveIdempotencia);
-	}
-
-	private String cobrarUnaVez(String clave) {
-		return cobros.computeIfAbsent(clave, c -> "prueba_" + UUID.randomUUID());
+		devoluciones.add(referencia);
 	}
 }

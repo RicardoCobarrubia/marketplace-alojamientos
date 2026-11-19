@@ -12,25 +12,32 @@ import co.edu.unbosque.marketplace.pagos.dominio.SolicitudCobro;
 class PasarelaSimuladaTest {
 
 	private final PasarelaSimulada pasarela = new PasarelaSimulada();
+	private final SolicitudCobro solicitud = new SolicitudCobro("reserva-1", BigDecimal.TEN, "Reserva 1");
 
 	@Test
-	void cobraUnaSolaVezPorClave() {
-		SolicitudCobro solicitud = new SolicitudCobro("reserva-1", BigDecimal.TEN, "Reserva 1");
+	void prepararConLaMismaClaveDaLaMismaReferenciaYNoCobra() {
+		String referencia = pasarela.preparar(solicitud);
 
-		var primero = pasarela.cobrar(solicitud);
-		var segundo = pasarela.cobrar(solicitud);
-
-		assertThat(primero.estado()).isEqualTo(EstadoPago.APROBADO);
-		assertThat(segundo).isEqualTo(primero);
-		assertThat(pasarela.cantidadCobros()).isEqualTo(1);
-		assertThat(pasarela.consultar("reserva-1", BigDecimal.TEN)).isEqualTo(primero);
-		assertThat(pasarela.consultar("reserva-2", BigDecimal.TEN).estado()).isEqualTo(EstadoPago.NO_COBRADO);
+		assertThat(pasarela.preparar(solicitud)).isEqualTo(referencia);
+		assertThat(pasarela.consultar(referencia).estado()).isEqualTo(EstadoPago.NO_COBRADO);
+		assertThat(pasarela.cantidadCobros()).isZero();
 	}
 
 	@Test
-	void devuelveUnaSolaVezPorClave() {
-		pasarela.devolver("sim_1", BigDecimal.TEN, "reserva-1");
-		pasarela.devolver("sim_1", BigDecimal.TEN, "reserva-1");
+	void cobraUnaSolaVezPorReferencia() {
+		String referencia = pasarela.preparar(solicitud);
+
+		assertThat(pasarela.cobrar(referencia, solicitud).estado()).isEqualTo(EstadoPago.APROBADO);
+		pasarela.cobrar(referencia, solicitud);
+
+		assertThat(pasarela.cantidadCobros()).isEqualTo(1);
+		assertThat(pasarela.consultar(referencia).referencia()).isEqualTo(referencia);
+	}
+
+	@Test
+	void devuelveUnaSolaVezPorCobro() {
+		pasarela.devolver("sim_1", BigDecimal.TEN, "reserva-1", 1);
+		pasarela.devolver("sim_1", BigDecimal.TEN, "reserva-1", 2);
 
 		assertThat(pasarela.cantidadDevoluciones()).isEqualTo(1);
 	}

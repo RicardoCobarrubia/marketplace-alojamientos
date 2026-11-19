@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -96,6 +98,11 @@ class ReservaServiceTest {
 	// Flujo normal
 	// ─────────────────────────────────────────
 
+	private void sePrepara() {
+		seCrea();
+		when(pasarela.preparar(any(SolicitudCobro.class))).thenReturn("pi_1");
+	}
+
 	@Test
 	void exigeLaClaveDeIdempotencia() {
 		assertThatThrownBy(() -> servicio.reservar(huesped, " ", solicitud))
@@ -107,30 +114,37 @@ class ReservaServiceTest {
 	}
 
 	@Test
-	void conElPagoAprobadoConfirmaYNoDevuelve() {
-		seCrea();
-		when(pasarela.cobrar(any(SolicitudCobro.class))).thenReturn(ResultadoPago.aprobado("pi_1"));
+	void guardaLaReferenciaAntesDeCobrarYConfirma() {
+		sePrepara();
+		SolicitudCobro cobro = new SolicitudCobro(CLAVE_PAGO, reserva.getTotal(), "Reserva 50");
+		when(pasarela.cobrar("pi_1", cobro)).thenReturn(ResultadoPago.aprobado("pi_1"));
 		when(transacciones.confirmar(50L, "pi_1")).thenReturn(new Desenlace(CREADA, false));
 
 		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(CREADA);
-		verify(pasarela).cobrar(new SolicitudCobro(CLAVE_PAGO, reserva.getTotal(), "Reserva 50"));
-		verify(pasarela, never()).devolver(any(), any(), any());
+
+		var orden = inOrder(pasarela, transacciones);
+		orden.verify(pasarela).preparar(cobro);
+		orden.verify(transacciones).registrarReferencia(50L, "pi_1");
+		orden.verify(pasarela).cobrar("pi_1", cobro);
+		verify(pasarela, never()).devolver(any(), any(), any(), anyInt());
 	}
 
 	@Test
 	void siLasFechasSeLiberaronMientrasPagabaDevuelveElCobro() {
-		seCrea();
-		when(pasarela.cobrar(any(SolicitudCobro.class))).thenReturn(ResultadoPago.aprobado("pi_1"));
+		sePrepara();
+		when(pasarela.cobrar(eq("pi_1"), any())).thenReturn(ResultadoPago.aprobado("pi_1"));
 		when(transacciones.confirmar(50L, "pi_1")).thenReturn(new Desenlace(FALLIDA, true));
+		when(transacciones.siguienteIntentoDevolucion(50L)).thenReturn(1);
 
 		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(FALLIDA);
-		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO);
+		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO, 1);
+		verify(transacciones).marcarPagoVerificado(50L, "pi_1");
 	}
 
 	@Test
 	void conElPagoRechazadoCompensaCon402() {
-		seCrea();
-		when(pasarela.cobrar(any(SolicitudCobro.class))).thenReturn(ResultadoPago.rechazado("pi_1", "Sin fondos"));
+		sePrepara();
+		when(pasarela.cobrar(eq("pi_1"), any())).thenReturn(ResultadoPago.rechazado("pi_1", "Sin fondos"));
 		when(transacciones.compensar(eq(50L), eq(HttpStatus.PAYMENT_REQUIRED), eq("PAGO_RECHAZADO"), any(),
 				eq("pi_1"), eq(false), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
 
@@ -142,53 +156,68 @@ class ReservaServiceTest {
 	// ─────────────────────────────────────────
 
 	@Test
-	void siNoRespondePeroSiCobroCompensaYDevuelve() {
+	void siNoRespondeAlPrepararNoHuboCobroYSeCompensaSinDudas() {
 		seCrea();
-		when(pasarela.cobrar(any(SolicitudCobro.class))).thenThrow(new PasarelaNoDisponibleException("timeout"));
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(pasarela.preparar(any())).thenThrow(new PasarelaNoDisponibleException("timeout"));
 		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), eq("PASARELA_SIN_RESPUESTA"), any(),
-				eq("pi_1"), eq(false), eq(true))).thenReturn(new Desenlace(FALLIDA, true));
+				isNull(), eq(false), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
 
-		servicio.reservar(huesped, CLAVE, solicitud);
-
-		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO);
+		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(FALLIDA);
+		verify(transacciones, never()).registrarReferencia(any(), any());
+		verify(pasarela, never()).cobrar(any(), any());
 	}
 
 	@Test
-	void siNoRespondeNiCobroCompensaSinDevolver() {
-		seCrea();
-		when(pasarela.cobrar(any(SolicitudCobro.class))).thenThrow(new PasarelaNoDisponibleException("timeout"));
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.noCobrado());
-		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(false), eq(false)))
-				.thenReturn(new Desenlace(FALLIDA, false));
+	void siNoRespondeAlCobrarPeroSiCobroCompensaYDevuelve() {
+		sePrepara();
+		when(pasarela.cobrar(eq("pi_1"), any())).thenThrow(new PasarelaNoDisponibleException("timeout"));
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), eq("PASARELA_SIN_RESPUESTA"), any(),
+				isNull(), eq(false), eq(true))).thenReturn(new Desenlace(FALLIDA, true));
+		when(transacciones.siguienteIntentoDevolucion(50L)).thenReturn(1);
 
 		servicio.reservar(huesped, CLAVE, solicitud);
 
-		verify(pasarela, never()).devolver(any(), any(), any());
+		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO, 1);
+	}
+
+	@Test
+	void siNoRespondeNiCobroQuedaPorVerificarUnaVezMas() {
+		sePrepara();
+		when(pasarela.cobrar(eq("pi_1"), any())).thenThrow(new PasarelaNoDisponibleException("timeout"));
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.noCobrado());
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(true),
+				eq(false))).thenReturn(new Desenlace(FALLIDA, false));
+
+		servicio.reservar(huesped, CLAVE, solicitud);
+
+		verify(pasarela, never()).devolver(any(), any(), any(), anyInt());
 	}
 
 	@Test
 	void siTampocoRespondeLaConsultaQuedaPorVerificar() {
-		seCrea();
-		when(pasarela.cobrar(any(SolicitudCobro.class))).thenThrow(new PasarelaNoDisponibleException("timeout"));
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenThrow(new PasarelaNoDisponibleException("caída"));
-		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(true), eq(false)))
-				.thenReturn(new Desenlace(FALLIDA, false));
+		sePrepara();
+		when(pasarela.cobrar(eq("pi_1"), any())).thenThrow(new PasarelaNoDisponibleException("timeout"));
+		when(pasarela.consultar("pi_1")).thenThrow(new PasarelaNoDisponibleException("caída"));
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(true),
+				eq(false))).thenReturn(new Desenlace(FALLIDA, false));
 
 		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(FALLIDA);
 	}
 
 	@Test
 	void siLaDevolucionFallaElConciliadorLaReintenta() {
-		seCrea();
-		when(pasarela.cobrar(any(SolicitudCobro.class))).thenReturn(ResultadoPago.aprobado("pi_1"));
+		sePrepara();
+		when(pasarela.cobrar(eq("pi_1"), any())).thenReturn(ResultadoPago.aprobado("pi_1"));
 		when(transacciones.confirmar(50L, "pi_1")).thenReturn(new Desenlace(FALLIDA, true));
+		when(transacciones.siguienteIntentoDevolucion(50L)).thenReturn(1);
 		doThrow(new PasarelaNoDisponibleException("caída")).when(pasarela).devolver("pi_1", reserva.getTotal(),
-				CLAVE_PAGO);
+				CLAVE_PAGO, 1);
 
 		servicio.reservar(huesped, CLAVE, solicitud);
 
 		verify(transacciones).marcarPagoPorVerificar(50L);
+		verify(transacciones, never()).marcarPagoVerificado(any(), any());
 	}
 
 	// ─────────────────────────────────────────
@@ -206,6 +235,17 @@ class ReservaServiceTest {
 	}
 
 	@Test
+	void unInterbloqueoEntreReservasSimultaneasEsUnConflictoControlado() {
+		when(transacciones.iniciar(any(), any(), any(), any()))
+				.thenThrow(new CannotAcquireLockException("deadlock detected"));
+		when(transacciones.buscarClave(2L, CLAVE)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servicio.reservar(huesped, CLAVE, solicitud))
+				.isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "FECHAS_NO_DISPONIBLES");
+	}
+
+	@Test
 	void unReintentoTerminadoRecibeLaMismaRespuestaSinCobrar() {
 		ClaveIdempotencia previa = clavePrevia(ReservaService.huella(solicitud));
 		previa.terminar(201, "{\"id\":50}", AHORA);
@@ -213,7 +253,7 @@ class ReservaServiceTest {
 		when(transacciones.buscarClave(2L, CLAVE)).thenReturn(Optional.of(previa));
 
 		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(CREADA);
-		verify(pasarela, never()).cobrar(any());
+		verify(pasarela, never()).preparar(any());
 	}
 
 	@Test
@@ -229,17 +269,50 @@ class ReservaServiceTest {
 	}
 
 	@Test
-	void unReintentoDeUnaReservaHuerfanaConsultaYConfirma() {
-		Reserva vieja = reserva;
-		TestDatos.asignar(vieja, "creadoEn", AHORA.minusSeconds(60));
+	void unReintentoQueVeLaReservaYaResueltaRecibeLaRespuestaGuardada() {
+		ClaveIdempotencia enCurso = clavePrevia(ReservaService.huella(solicitud));
+		ClaveIdempotencia terminada = clavePrevia(ReservaService.huella(solicitud));
+		terminada.terminar(201, "{\"id\":50}", AHORA);
+		reserva.registrarReferencia("pi_1", AHORA);
+		reserva.confirmar("pi_1", AHORA);
+		when(transacciones.iniciar(any(), any(), any(), any())).thenThrow(new DataIntegrityViolationException("uq"));
+		when(transacciones.buscarClave(2L, CLAVE)).thenReturn(Optional.of(enCurso), Optional.of(terminada));
+		when(transacciones.buscar(50L)).thenReturn(Optional.of(reserva));
+
+		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(CREADA);
+	}
+
+	@Test
+	void unReintentoDeUnaReservaHuerfanaConsultaPorSuReferenciaYConfirma() {
+		TestDatos.asignar(reserva, "creadoEn", AHORA.minusSeconds(60));
+		reserva.registrarReferencia("pi_1", AHORA);
 		when(transacciones.iniciar(any(), any(), any(), any())).thenThrow(new DataIntegrityViolationException("uq"));
 		when(transacciones.buscarClave(2L, CLAVE)).thenReturn(Optional.of(clavePrevia(ReservaService.huella(solicitud))));
-		when(transacciones.buscar(50L)).thenReturn(Optional.of(vieja));
-		when(pasarela.consultar(CLAVE_PAGO, vieja.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(transacciones.buscar(50L)).thenReturn(Optional.of(reserva));
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.aprobado("pi_1"));
 		when(transacciones.confirmar(50L, "pi_1")).thenReturn(new Desenlace(CREADA, false));
 
 		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(CREADA);
-		verify(pasarela, never()).cobrar(any());
+		verify(pasarela, never()).cobrar(any(), any());
+	}
+
+	@Test
+	void unaReservaHuerfanaSinReferenciaNuncaSeCobroYSeCompensa() {
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.PAYMENT_REQUIRED), eq("PAGO_NO_REALIZADO"), any(),
+				isNull(), eq(false), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
+
+		assertThat(servicio.recuperar(reserva)).isEqualTo(FALLIDA);
+		verify(pasarela, never()).consultar(any());
+	}
+
+	@Test
+	void recuperarConReferenciaSinCobroQuedaPorVerificar() {
+		reserva.registrarReferencia("pi_1", AHORA);
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.noCobrado());
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.PAYMENT_REQUIRED), eq("PAGO_NO_REALIZADO"), any(),
+				isNull(), eq(true), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
+
+		assertThat(servicio.recuperar(reserva)).isEqualTo(FALLIDA);
 	}
 
 	@Test
@@ -268,85 +341,79 @@ class ReservaServiceTest {
 	// ─────────────────────────────────────────
 
 	@Test
+	void alVencerSinReferenciaSeCompensaSinConsultar() {
+		servicio.vencer(reserva);
+
+		verify(transacciones).compensar(eq(50L), eq(HttpStatus.CONFLICT), eq("RETENCION_VENCIDA"), any(), isNull(),
+				eq(false), eq(false));
+		verify(pasarela, never()).consultar(any());
+	}
+
+	@Test
 	void alVencerLaRetencionSeCompensaYSeDevuelveSiAlcanzoACobrar() {
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
-		when(transacciones.compensar(eq(50L), eq(HttpStatus.CONFLICT), eq("RETENCION_VENCIDA"), any(), eq("pi_1"),
+		reserva.registrarReferencia("pi_1", AHORA);
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.CONFLICT), eq("RETENCION_VENCIDA"), any(), isNull(),
 				eq(false), eq(true))).thenReturn(new Desenlace(FALLIDA, true));
+		when(transacciones.siguienteIntentoDevolucion(50L)).thenReturn(1);
 
 		servicio.vencer(reserva);
 
-		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO);
+		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO, 1);
 		verify(transacciones).marcarPagoVerificado(50L, "pi_1");
 	}
 
 	@Test
 	void siOtroFlujoLaConfirmoAlVencerNoSeDevuelve() {
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+		reserva.registrarReferencia("pi_1", AHORA);
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.aprobado("pi_1"));
 		when(transacciones.compensar(eq(50L), any(), any(), any(), any(), anyBoolean(), anyBoolean()))
 				.thenReturn(new Desenlace(CREADA, false));
 
 		servicio.vencer(reserva);
 
-		verify(pasarela, never()).devolver(any(), any(), any());
+		verify(pasarela, never()).devolver(any(), any(), any(), anyInt());
 	}
 
 	@Test
 	void alVencerSinPasarelaQuedaPorVerificar() {
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenThrow(new PasarelaNoDisponibleException("caída"));
+		reserva.registrarReferencia("pi_1", AHORA);
+		when(pasarela.consultar("pi_1")).thenThrow(new PasarelaNoDisponibleException("caída"));
 
 		servicio.vencer(reserva);
 
-		verify(transacciones).compensar(eq(50L), any(), eq("RETENCION_VENCIDA"), any(), isNull(), eq(true),
-				eq(false));
+		verify(transacciones).compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), eq("RETENCION_VENCIDA"), any(),
+				isNull(), eq(true), eq(false));
 	}
 
 	@Test
 	void verificarUnPagoEnDudaDevuelveSiHuboCobro() {
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+		reserva.registrarReferencia("pi_1", AHORA);
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(transacciones.siguienteIntentoDevolucion(50L)).thenReturn(2);
 
 		servicio.verificarPago(reserva);
 
-		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO);
+		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO, 2);
 		verify(transacciones).marcarPagoVerificado(50L, "pi_1");
 	}
 
 	@Test
 	void verificarUnPagoDeUnaReservaConfirmadaNoLoDevuelve() {
+		reserva.registrarReferencia("pi_1", AHORA);
 		reserva.confirmar("pi_1", AHORA);
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(pasarela.consultar("pi_1")).thenReturn(ResultadoPago.aprobado("pi_1"));
 
 		servicio.verificarPago(reserva);
 
-		verify(pasarela, never()).devolver(any(), any(), any());
+		verify(pasarela, never()).devolver(any(), any(), any(), anyInt());
 	}
 
 	@Test
-	void unInterbloqueoEntreReservasSimultaneasEsUnConflictoControlado() {
-		when(transacciones.iniciar(any(), any(), any(), any()))
-				.thenThrow(new CannotAcquireLockException("deadlock detected"));
-		when(transacciones.buscarClave(2L, CLAVE)).thenReturn(Optional.empty());
-
-		assertThatThrownBy(() -> servicio.reservar(huesped, CLAVE, solicitud))
-				.isInstanceOf(ReglaNegocioException.class)
-				.hasFieldOrPropertyWithValue("codigo", "FECHAS_NO_DISPONIBLES");
-	}
-
-	@Test
-	void verificarUnPagoSinCobroSoloLoMarca() {
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.noCobrado());
-
+	void verificarUnPagoSinReferenciaSoloLoMarca() {
 		servicio.verificarPago(reserva);
 
-		verify(pasarela, never()).devolver(any(), any(), any());
+		verify(pasarela, never()).consultar(any());
 		verify(transacciones).marcarPagoVerificado(eq(50L), isNull());
-	}
-
-	@Test
-	void recuperarSinCobroCompensa() {
-		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.noCobrado());
-		when(transacciones.compensar(eq(50L), eq(HttpStatus.PAYMENT_REQUIRED), eq("PAGO_NO_REALIZADO"), any(),
-				isNull(), anyBoolean(), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
-
-		assertThat(servicio.recuperar(reserva)).isEqualTo(FALLIDA);
 	}
 }

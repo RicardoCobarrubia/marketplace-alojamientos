@@ -227,6 +227,18 @@ public class ReservaTransacciones {
 	// Conciliación — MA-60, MA-68
 	// ─────────────────────────────────────────
 
+	/** Guarda la referencia del cobro preparado, antes de cobrar (ADR-004). */
+	@Transactional
+	public void registrarReferencia(Long reservaId, String referenciaPago) {
+		bloquear(reservaId).registrarReferencia(referenciaPago, reloj.instant());
+	}
+
+	/** Cuenta el intento de devolución en su propia transacción y devuelve su número. */
+	@Transactional
+	public int siguienteIntentoDevolucion(Long reservaId) {
+		return bloquear(reservaId).siguienteIntentoDevolucion(reloj.instant());
+	}
+
 	@Transactional
 	public void marcarPagoVerificado(Long reservaId, String referenciaPago) {
 		bloquear(reservaId).pagoVerificado(referenciaPago, reloj.instant());

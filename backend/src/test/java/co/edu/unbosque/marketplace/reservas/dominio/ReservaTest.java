@@ -71,6 +71,28 @@ class ReservaTest {
 	}
 
 	@Test
+	void laReferenciaDelCobroSeGuardaUnaSolaVezMientrasEstaPendiente() {
+		reserva.registrarReferencia("pi_1", AHORA);
+		reserva.registrarReferencia("pi_2", AHORA);
+		assertThat(reserva.getReferenciaPago()).isEqualTo("pi_1");
+
+		reserva.marcarPagoFallido("Sin respuesta", null, true, AHORA);
+		assertThat(reserva.getReferenciaPago()).isEqualTo("pi_1");
+
+		reserva.registrarReferencia("pi_3", AHORA);
+		assertThat(reserva.getReferenciaPago()).isEqualTo("pi_1");
+	}
+
+	@Test
+	void cadaIntentoDeDevolucionTieneUnNumeroNuevo() {
+		assertThat(reserva.getIntentosDevolucion()).isZero();
+
+		assertThat(reserva.siguienteIntentoDevolucion(AHORA)).isEqualTo(1);
+		assertThat(reserva.siguienteIntentoDevolucion(AHORA.plusSeconds(5))).isEqualTo(2);
+		assertThat(reserva.getActualizadoEn()).isEqualTo(AHORA.plusSeconds(5));
+	}
+
+	@Test
 	void unPagoFallidoNoSePuedeConfirmarDespues() {
 		reserva.marcarPagoFallido("Sin fondos", null, true, AHORA);
 

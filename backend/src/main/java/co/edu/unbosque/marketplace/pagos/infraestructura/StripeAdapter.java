@@ -33,20 +33,23 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Adaptador de Stripe en modo de pruebas (ADR-006). Es la única clase que conoce Stripe: cambiar
  * de proveedor es escribir otro adaptador.
- * <p>
- * El cobro se hace en dos pasos para poder consultar su estado real después de un timeout
- * (ADR-004):
- * <ol>
- * <li>Crear el PaymentIntent sin confirmar (no cobra) con la clave {@code <clave>:crear}.</li>
- * <li>Confirmarlo con la clave {@code <clave>:confirmar}: aquí se cobra.</li>
- * </ol>
- * Para consultar se repite el paso 1 con la misma clave: Stripe devuelve el mismo
- * PaymentIntent sin crear otro, y se lee su estado actual.
+ * <ul>
+ * <li>{@link #preparar}: crea el PaymentIntent sin confirmar (no cobra). Su id es la referencia
+ * que la reserva guarda.</li>
+ * <li>{@link #cobrar}: confirma ese PaymentIntent; aquí se cobra.</li>
+ * <li>{@link #consultar}: lee el PaymentIntent por su id. No depende de las claves de
+ * idempotencia, que Stripe borra a las 24 horas.</li>
+ * <li>{@link #devolver}: antes de pedir la devolución revisa si ya existe una para ese cobro.
+ * Cada intento usa su propia clave, porque Stripe repite la respuesta guardada de una clave,
+ * incluso si fue un error.</li>
+ * </ul>
  */
 public class StripeAdapter implements PasarelaPagos {
 
 	private static final Logger log = LoggerFactory.getLogger(StripeAdapter.class);
 	private static final String EXITOSO = "succeeded";
+	/** Estados de una devolución que ya está hecha o en camino: no se pide otra. */
+	private static final Set<String> DEVOLUCION_VIGENTE = Set.of("succeeded", "pending", "requires_action");
 	/** Monedas sin decimales en Stripe: el adaptador solo maneja monedas con centavos, como COP. */
 	private static final Set<String> SIN_DECIMALES = Set.of("bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga",
 			"pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf");
@@ -82,58 +85,64 @@ public class StripeAdapter implements PasarelaPagos {
 		this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
 	}
 
-	/**
-	 * Los dos pasos comparten el mismo límite de tiempo ({@code marketplace.pagos.timeout}): la
-	 * confirmación solo usa lo que dejó la creación.
-	 */
 	@Override
-	public ResultadoPago cobrar(SolicitudCobro solicitud) {
-		Instant limite = Instant.now().plus(timeout);
-		String id = crear(solicitud.claveIdempotencia(), solicitud.monto(), limite);
-		Respuesta confirmacion = enviar("POST", "/v1/payment_intents/" + id + "/confirm", Map.of(),
-				solicitud.claveIdempotencia() + ":confirmar", limite);
-		JsonNode error = confirmacion.cuerpo().path("error");
-		if (confirmacion.estado() == 402 || "card_error".equals(error.path("type").asString(""))) {
-			// Stripe rechazó la tarjeta. Otros errores (parámetros, clave...) dejan el cobro en duda
-			return ResultadoPago.rechazado(id, error.path("message").asString(""));
-		}
-		verificar(confirmacion);
-		String estado = confirmacion.cuerpo().path("status").asString("");
-		return EXITOSO.equals(estado) ? ResultadoPago.aprobado(id) : ResultadoPago.rechazado(id, estado);
+	public String preparar(SolicitudCobro solicitud) {
+		Map<String, String> datos = new LinkedHashMap<>();
+		datos.put("amount", centavos(solicitud.monto()));
+		datos.put("currency", moneda);
+		datos.put("payment_method_types[]", "card");
+		datos.put("payment_method", metodoPago);
+		datos.put("description", solicitud.descripcion());
+		datos.put("metadata[clave_idempotencia]", solicitud.claveIdempotencia());
+		Respuesta creacion = enviar("POST", "/v1/payment_intents", datos, solicitud.claveIdempotencia() + ":crear",
+				limite());
+		verificar(creacion);
+		return creacion.cuerpo().path("id").asString();
 	}
 
 	@Override
-	public ResultadoPago consultar(String claveIdempotencia, BigDecimal monto) {
-		Instant limite = Instant.now().plus(timeout);
-		String id = crear(claveIdempotencia, monto, limite);
-		Respuesta actual = enviar("GET", "/v1/payment_intents/" + id, Map.of(), null, limite);
+	public ResultadoPago cobrar(String referencia, SolicitudCobro solicitud) {
+		Respuesta confirmacion = enviar("POST", "/v1/payment_intents/" + referencia + "/confirm", Map.of(),
+				solicitud.claveIdempotencia() + ":confirmar", limite());
+		JsonNode error = confirmacion.cuerpo().path("error");
+		if (confirmacion.estado() == 402 || "card_error".equals(error.path("type").asString(""))) {
+			// Stripe rechazó la tarjeta. Otros errores (parámetros, clave...) dejan el cobro en duda
+			return ResultadoPago.rechazado(referencia, error.path("message").asString(""));
+		}
+		verificar(confirmacion);
+		String estado = confirmacion.cuerpo().path("status").asString("");
+		return EXITOSO.equals(estado) ? ResultadoPago.aprobado(referencia) : ResultadoPago.rechazado(referencia, estado);
+	}
+
+	@Override
+	public ResultadoPago consultar(String referencia) {
+		Respuesta actual = enviar("GET", "/v1/payment_intents/" + codificar(referencia), Map.of(), null, limite());
 		verificar(actual);
 		return EXITOSO.equals(actual.cuerpo().path("status").asString(""))
-				? ResultadoPago.aprobado(id)
+				? ResultadoPago.aprobado(referencia)
 				: ResultadoPago.noCobrado();
 	}
 
 	@Override
-	public void devolver(String referencia, BigDecimal monto, String claveIdempotencia) {
+	public void devolver(String referencia, BigDecimal monto, String claveIdempotencia, int intento) {
+		Respuesta existentes = enviar("GET", "/v1/refunds?limit=10&payment_intent=" + codificar(referencia), Map.of(),
+				null, limite());
+		verificar(existentes);
+		for (JsonNode devolucion : existentes.cuerpo().path("data")) {
+			if (DEVOLUCION_VIGENTE.contains(devolucion.path("status").asString(""))) {
+				log.info("El cobro {} ya tiene una devolución", referencia);
+				return;
+			}
+		}
 		Map<String, String> datos = new LinkedHashMap<>();
 		datos.put("payment_intent", referencia);
 		datos.put("amount", centavos(monto));
-		verificar(enviar("POST", "/v1/refunds", datos, claveIdempotencia + ":devolucion", Instant.now().plus(timeout)));
-		log.info("Devolución solicitada a Stripe (cobro {})", referencia);
+		verificar(enviar("POST", "/v1/refunds", datos, claveIdempotencia + ":devolucion:" + intento, limite()));
+		log.info("Devolución solicitada a Stripe (cobro {}, intento {})", referencia, intento);
 	}
 
-	/** Crea el PaymentIntent sin confirmar. Con la misma clave, Stripe devuelve el mismo. */
-	private String crear(String claveIdempotencia, BigDecimal monto, Instant limite) {
-		Map<String, String> datos = new LinkedHashMap<>();
-		datos.put("amount", centavos(monto));
-		datos.put("currency", moneda);
-		datos.put("payment_method_types[]", "card");
-		datos.put("payment_method", metodoPago);
-		datos.put("description", "Reserva " + claveIdempotencia);
-		datos.put("metadata[clave_idempotencia]", claveIdempotencia);
-		Respuesta creacion = enviar("POST", "/v1/payment_intents", datos, claveIdempotencia + ":crear", limite);
-		verificar(creacion);
-		return creacion.cuerpo().path("id").asString();
+	private Instant limite() {
+		return Instant.now().plus(timeout);
 	}
 
 	private Respuesta enviar(String metodo, String ruta, Map<String, String> datos, String claveIdempotencia,
