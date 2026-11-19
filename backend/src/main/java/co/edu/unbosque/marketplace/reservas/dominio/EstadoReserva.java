@@ -45,4 +45,9 @@ public enum EstadoReserva {
 	public boolean puedePasarA(EstadoReserva destino) {
 		return siguientes().contains(destino);
 	}
+
+	/** La reserva llegó a confirmarse con su cobro, aunque después se haya cancelado o completado. */
+	public boolean fueConfirmada() {
+		return this == CONFIRMADA || this == EN_REVISION || this == CANCELADA || this == COMPLETADA;
+	}
 }

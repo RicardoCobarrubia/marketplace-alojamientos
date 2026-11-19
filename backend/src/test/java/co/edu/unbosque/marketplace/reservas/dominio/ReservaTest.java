@@ -179,8 +179,9 @@ class ReservaTest {
 	@Test
 	void unaReservaEnCursoNoSePuedeCancelar() {
 		reserva.confirmar("pi_1", AHORA);
+		LocalDate diaDeLlegada = RANGO.llegada();
 
-		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", RANGO.llegada(), AHORA))
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", diaDeLlegada, AHORA))
 				.isInstanceOf(ReglaNegocioException.class)
 				.hasFieldOrPropertyWithValue("codigo", "CANCELACION_NO_PERMITIDA");
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
@@ -210,6 +211,14 @@ class ReservaTest {
 	void soloSeCompletaUnaReservaConfirmada() {
 		assertThat(reserva.completar(RANGO.salida().plusDays(1), AHORA)).isFalse();
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.PENDIENTE_PAGO);
+	}
+
+	@ParameterizedTest
+	@EnumSource(EstadoReserva.class)
+	void fueConfirmadaSiPasoPorCONFIRMADA(EstadoReserva estado) {
+		boolean esperado = estado != EstadoReserva.PENDIENTE_PAGO && estado != EstadoReserva.PAGO_FALLIDO;
+
+		assertThat(estado.fueConfirmada()).isEqualTo(esperado);
 	}
 
 	@Test

@@ -25,6 +25,7 @@ import org.springframework.web.context.WebApplicationContext;
 import co.edu.unbosque.marketplace.ApiDePrueba;
 import co.edu.unbosque.marketplace.TestcontainersConfiguration;
 import co.edu.unbosque.marketplace.reservas.aplicacion.ConciliadorReservas;
+import co.edu.unbosque.marketplace.reservas.aplicacion.ReservaTransacciones;
 
 /**
  * Consultar, cancelar y completar reservas contra PostgreSQL real (MA-70, MA-71, MA-72).
@@ -51,6 +52,8 @@ class GestionReservasIntegrationTest {
 	private PasarelaDePrueba pasarela;
 	@Autowired
 	private ConciliadorReservas conciliador;
+	@Autowired
+	private ReservaTransacciones transacciones;
 
 	private ApiDePrueba api;
 	private String anfitrion;
@@ -218,5 +221,11 @@ class GestionReservasIntegrationTest {
 		assertThat(ultimoEvento(terminada)).isEqualTo("RESERVA_COMPLETADA");
 		assertThat(conciliador.completarTerminadas()).isZero();
 		cancelar(huesped, terminada, "{\"motivo\":\"Tarde\"}").andExpect(status().isConflict());
+
+		// Un reintento tardío con el mismo cobro no lo devuelve: ese cobro pagó la estadía
+		String referencia = jdbc.queryForObject("SELECT referencia_pago FROM reserva WHERE id = ?", String.class,
+				terminada);
+		assertThat(transacciones.confirmar(terminada, referencia).requiereDevolucion()).isFalse();
+		assertThat(estadoReserva(terminada)).isEqualTo("COMPLETADA");
 	}
 }

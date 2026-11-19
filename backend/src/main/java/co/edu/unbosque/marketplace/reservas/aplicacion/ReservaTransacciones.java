@@ -154,8 +154,9 @@ public class ReservaTransacciones {
 	@Transactional
 	public Desenlace confirmar(Long reservaId, String referenciaPago) {
 		Reserva reserva = bloquear(reservaId);
-		if (reserva.getEstado() == EstadoReserva.CONFIRMADA && referenciaPago.equals(reserva.getReferenciaPago())) {
-			// Otro reintento ya la confirmó con este mismo cobro: no hay nada que devolver
+		if (reserva.getEstado().fueConfirmada() && referenciaPago.equals(reserva.getReferenciaPago())) {
+			// Otro reintento ya la confirmó con este mismo cobro (y quizá ya se completó o canceló):
+			// ese cobro pagó la reserva, así que no se devuelve aquí
 			return new Desenlace(respuestaGuardada(reserva), false);
 		}
 		if (reserva.getEstado() != EstadoReserva.PENDIENTE_PAGO) {
