@@ -196,8 +196,11 @@ class ReservaIntegrationTest {
 				+ "AND liberado_en IS NULL", id)).isEqualTo(1);
 		assertThat(jdbc.queryForObject("SELECT tipo FROM evento_outbox WHERE agregado_id = ?", String.class, id))
 				.isEqualTo("RESERVA_CONFIRMADA");
-		assertThat(jdbc.queryForObject("SELECT correlation_id FROM reserva WHERE id = ?", String.class, id))
-				.isNotBlank();
+		// ADR-012: la reserva y su evento quedan con el mismo id de correlación de la petición
+		String correlacion = jdbc.queryForObject("SELECT correlation_id FROM reserva WHERE id = ?", String.class, id);
+		assertThat(correlacion).isNotBlank();
+		assertThat(jdbc.queryForObject("SELECT correlation_id FROM evento_outbox WHERE agregado_id = ?", String.class,
+				id)).isEqualTo(correlacion);
 
 		api.como(huesped, get("/api/reservas/" + id)).andExpect(status().isOk());
 		api.como(anfitrion, get("/api/reservas/" + id)).andExpect(jsonPath("$.estado").value("CONFIRMADA"));

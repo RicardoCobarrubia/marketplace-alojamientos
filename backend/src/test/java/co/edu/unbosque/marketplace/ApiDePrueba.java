@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import co.edu.unbosque.marketplace.comun.web.CorrelacionFilter;
+
 /**
  * Ayudas para las pruebas de integración contra la API: usuarios, sesión y alojamientos
  * activos. Cada prueba parte de una base de datos sin usuarios.
@@ -35,7 +37,11 @@ public class ApiDePrueba {
 
 	public ApiDePrueba(WebApplicationContext contexto, JdbcTemplate jdbc, PasswordEncoder passwordEncoder,
 			CacheManager cacheManager) {
-		this.mvc = MockMvcBuilders.webAppContextSetup(contexto).apply(springSecurity()).build();
+		// El filtro de correlación va primero, como en la aplicación real (ADR-012)
+		this.mvc = MockMvcBuilders.webAppContextSetup(contexto)
+				.addFilters(contexto.getBean(CorrelacionFilter.class))
+				.apply(springSecurity())
+				.build();
 		this.jdbc = jdbc;
 		this.passwordEncoder = passwordEncoder;
 		jdbc.execute("TRUNCATE TABLE usuario RESTART IDENTITY CASCADE");
