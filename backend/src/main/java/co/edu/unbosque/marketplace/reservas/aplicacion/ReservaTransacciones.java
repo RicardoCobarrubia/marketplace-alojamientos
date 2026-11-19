@@ -225,7 +225,8 @@ public class ReservaTransacciones {
 
 	@Transactional(readOnly = true)
 	public List<Long> pendientesVencidas() {
-		return reservaRepository.buscarPendientesCreadasAntesDe(reloj.instant().minus(retencion));
+		return reservaRepository.buscarPorEstadoCreadasAntesDe(EstadoReserva.PENDIENTE_PAGO,
+				reloj.instant().minus(retencion));
 	}
 
 	@Transactional(readOnly = true)

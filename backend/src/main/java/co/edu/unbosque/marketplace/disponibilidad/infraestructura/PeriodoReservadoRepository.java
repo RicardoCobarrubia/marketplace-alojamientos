@@ -24,6 +24,10 @@ public interface PeriodoReservadoRepository extends JpaRepository<PeriodoReserva
 			  and p.liberadoEn is null
 			  and (p.retenidoHasta is null or p.retenidoHasta > :ahora)
 			  and p.fechaLlegada < :hasta and p.fechaSalida > :desde""")
+	List<PeriodoReservado> buscarVigentesQueSeCruzan(@Param("alojamientoId") Long alojamientoId,
+			@Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta, @Param("ahora") Instant ahora);
+
+	/** Las fechas retenidas o bloqueadas de una reserva (MA-60). */
 	Optional<PeriodoReservado> findByReservaId(Long reservaId);
 
 	/**
@@ -40,7 +44,4 @@ public interface PeriodoReservadoRepository extends JpaRepository<PeriodoReserva
 			  and p.fechaLlegada < :hasta and p.fechaSalida > :desde""")
 	int liberarRetencionesVencidas(@Param("alojamientoId") Long alojamientoId, @Param("desde") LocalDate desde,
 			@Param("hasta") LocalDate hasta, @Param("ahora") Instant ahora);
-
-	List<PeriodoReservado> buscarVigentesQueSeCruzan(@Param("alojamientoId") Long alojamientoId,
-			@Param("desde") LocalDate desde, @Param("hasta") LocalDate hasta, @Param("ahora") Instant ahora);
 }
