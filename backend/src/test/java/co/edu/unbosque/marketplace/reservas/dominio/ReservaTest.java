@@ -136,4 +136,85 @@ class ReservaTest {
 	void losEstadosFinalesNoTienenSalida(EstadoReserva estado) {
 		assertThat(estado.siguientes()).isEmpty();
 	}
+
+	// ─────────────────────────────────────────
+	// Cancelar y completar — MA-71, MA-72
+	// ─────────────────────────────────────────
+
+	private static final LocalDate ANTES_DE_LLEGAR = RANGO.llegada().minusDays(1);
+
+	@Test
+	void elHuespedCancelaUnaReservaConfirmadaAntesDeLlegar() {
+		reserva.confirmar("pi_1", AHORA);
+
+		reserva.cancelar(2L, "  Cambio de planes ", ANTES_DE_LLEGAR, AHORA.plusSeconds(60));
+
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CANCELADA);
+		assertThat(reserva.getMotivoCancelacion()).isEqualTo("Cambio de planes");
+		assertThat(reserva.getCanceladaPor()).isEqualTo(2L);
+		assertThat(reserva.getCanceladaEn()).isEqualTo(AHORA.plusSeconds(60));
+	}
+
+	@Test
+	void unaReservaEnRevisionTambienSePuedeCancelar() {
+		reserva.confirmar("pi_1", AHORA);
+		TestDatos.asignar(reserva, "estado", EstadoReserva.EN_REVISION);
+
+		reserva.cancelar(2L, "No puedo viajar", ANTES_DE_LLEGAR, AHORA);
+
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CANCELADA);
+	}
+
+	@Test
+	void cancelarSinMotivoSeRechaza() {
+		reserva.confirmar("pi_1", AHORA);
+
+		assertThatThrownBy(() -> reserva.cancelar(2L, "  ", ANTES_DE_LLEGAR, AHORA))
+				.hasFieldOrPropertyWithValue("codigo", "MOTIVO_REQUERIDO");
+		assertThatThrownBy(() -> reserva.cancelar(2L, null, ANTES_DE_LLEGAR, AHORA))
+				.hasFieldOrPropertyWithValue("codigo", "MOTIVO_REQUERIDO");
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
+	}
+
+	@Test
+	void unaReservaEnCursoNoSePuedeCancelar() {
+		reserva.confirmar("pi_1", AHORA);
+
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", RANGO.llegada(), AHORA))
+				.isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "CANCELACION_NO_PERMITIDA");
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = EstadoReserva.class, names = { "PENDIENTE_PAGO", "PAGO_FALLIDO", "CANCELADA", "COMPLETADA" })
+	void soloSeCancelaUnaReservaConfirmadaOEnRevision(EstadoReserva estado) {
+		TestDatos.asignar(reserva, "estado", estado);
+
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", ANTES_DE_LLEGAR, AHORA))
+				.isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "CANCELACION_NO_PERMITIDA");
+	}
+
+	@Test
+	void seCompletaCuandoLlegaLaFechaDeSalida() {
+		reserva.confirmar("pi_1", AHORA);
+
+		assertThat(reserva.completar(RANGO.salida().minusDays(1), AHORA)).isFalse();
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
+		assertThat(reserva.completar(RANGO.salida(), AHORA)).isTrue();
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.COMPLETADA);
+	}
+
+	@Test
+	void soloSeCompletaUnaReservaConfirmada() {
+		assertThat(reserva.completar(RANGO.salida().plusDays(1), AHORA)).isFalse();
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.PENDIENTE_PAGO);
+	}
+
+	@Test
+	void sabeQuienHizoLaReserva() {
+		assertThat(reserva.esDe(2L)).isTrue();
+		assertThat(reserva.esDe(1L)).isFalse();
+	}
 }

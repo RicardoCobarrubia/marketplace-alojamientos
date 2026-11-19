@@ -81,7 +81,7 @@ class ReservaServiceTest {
 				null, AHORA);
 		TestDatos.asignar(reserva, "id", 50L);
 		solicitud = new ReservaDTO(null, 10L, rango.llegada(), rango.salida(), 2, Set.of(), null, null, null, null,
-				null, null, null, null, null, null, null, null, null);
+				null, null, null, null, null, null, null, null, null, null, null);
 	}
 
 	private void seCrea() {
@@ -328,9 +328,9 @@ class ReservaServiceTest {
 	@Test
 	void laHuellaNoDependeDelOrdenDeLosServicios() {
 		ReservaDTO conServicios = new ReservaDTO(null, 10L, solicitud.llegada(), solicitud.salida(), 2, Set.of(5L, 4L),
-				null, null, null, null, null, null, null, null, null, null, null, null, null);
+				null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 		ReservaDTO otroOrden = new ReservaDTO(null, 10L, solicitud.llegada(), solicitud.salida(), 2, Set.of(4L, 5L),
-				null, null, null, null, null, null, null, null, null, null, null, null, null);
+				null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
 		assertThat(ReservaService.huella(conServicios)).isEqualTo(ReservaService.huella(otroOrden))
 				.isNotEqualTo(ReservaService.huella(solicitud)).hasSize(64);

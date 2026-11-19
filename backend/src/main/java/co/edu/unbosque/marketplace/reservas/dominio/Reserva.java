@@ -11,6 +11,7 @@ import org.hibernate.type.SqlTypes;
 
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
+import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.cotizacion.dominio.Cotizacion;
 import co.edu.unbosque.marketplace.disponibilidad.dominio.RangoFechas;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
@@ -36,8 +37,8 @@ import jakarta.persistence.Version;
  * cancelación: lo que cambie después en el alojamiento no la afecta.
  * <p>
  * El estado no se escribe directamente: solo cambia con las operaciones de transición
- * ({@link #confirmar}, {@link #marcarPagoFallido}), que rechazan las no permitidas por
- * {@link EstadoReserva} (patrón State, ADR-004).
+ * ({@link #confirmar}, {@link #marcarPagoFallido}, {@link #cancelar}, {@link #completar}), que
+ * rechazan las no permitidas por {@link EstadoReserva} (patrón State, ADR-004; MA-71).
  */
 @Entity
 @Table(name = "reserva")
@@ -130,6 +131,19 @@ public class Reserva {
 	/** Intentos de devolución hechos; cada uno usa su propia clave de idempotencia. */
 	@Column(name = "intentos_devolucion", nullable = false)
 	private int intentosDevolucion;
+
+	// ─────────────────────────────────────────
+	// Cancelación — MA-72
+	// ─────────────────────────────────────────
+
+	@Column(name = "motivo_cancelacion", length = 500)
+	private String motivoCancelacion;
+
+	@Column(name = "cancelada_por")
+	private Long canceladaPor;
+
+	@Column(name = "cancelada_en")
+	private Instant canceladaEn;
 
 	@Column(name = "correlation_id", length = 100, updatable = false)
 	private String correlationId;
@@ -232,6 +246,52 @@ public class Reserva {
 		this.actualizadoEn = ahora;
 	}
 
+	// ─────────────────────────────────────────
+	// Transiciones — MA-71, MA-72
+	// ─────────────────────────────────────────
+
+	/**
+	 * El huésped cancela su reserva: CONFIRMADA o EN_REVISION → CANCELADA, siempre antes del día
+	 * de llegada (MA-72). Una reserva en curso, completada o ya cancelada no se puede cancelar.
+	 *
+	 * @param hoy la fecha de hoy en la zona horaria del marketplace
+	 */
+	public void cancelar(Long usuarioId, String motivo, LocalDate hoy, Instant ahora) {
+		if (motivo == null || motivo.isBlank()) {
+			throw new SolicitudInvalidaException("MOTIVO_REQUERIDO", "Debes indicar el motivo de la cancelación.");
+		}
+		if (estado != EstadoReserva.CONFIRMADA && estado != EstadoReserva.EN_REVISION) {
+			throw new ReglaNegocioException("CANCELACION_NO_PERMITIDA",
+					"Solo se puede cancelar una reserva confirmada o en revisión; esta está " + estado + ".");
+		}
+		if (!hoy.isBefore(fechaLlegada)) {
+			throw new ReglaNegocioException("CANCELACION_NO_PERMITIDA",
+					"La estadía ya empezó o terminó: la reserva no se puede cancelar.");
+		}
+		cambiarEstado(EstadoReserva.CANCELADA, ahora);
+		this.motivoCancelacion = motivo.strip();
+		this.canceladaPor = usuarioId;
+		this.canceladaEn = ahora;
+	}
+
+	/**
+	 * Una reserva CONFIRMADA cuya fecha de salida ya llegó pasa a COMPLETADA (MA-71, escenario 3).
+	 *
+	 * @return si la completó; una reserva en otro estado o con la salida pendiente no cambia
+	 */
+	public boolean completar(LocalDate hoy, Instant ahora) {
+		if (estado != EstadoReserva.CONFIRMADA || hoy.isBefore(fechaSalida)) {
+			return false;
+		}
+		cambiarEstado(EstadoReserva.COMPLETADA, ahora);
+		return true;
+	}
+
+	/** El huésped que hizo la reserva. */
+	public boolean esDe(Long usuarioId) {
+		return huesped.getId().equals(usuarioId);
+	}
+
 	private void cambiarEstado(EstadoReserva destino, Instant ahora) {
 		if (!estado.puedePasarA(destino)) {
 			throw new ReglaNegocioException("TRANSICION_INVALIDA",
@@ -244,7 +304,7 @@ public class Reserva {
 	/** El huésped que reservó, el anfitrión del alojamiento o un administrador (ADR-009). */
 	public boolean esVisiblePara(Usuario usuario) {
 		return usuario.getRol() == Rol.ADMINISTRADOR
-				|| huesped.getId().equals(usuario.getId())
+				|| esDe(usuario.getId())
 				|| alojamiento.esDe(usuario.getId());
 	}
 
@@ -342,6 +402,18 @@ public class Reserva {
 
 	public boolean isPagoPorVerificar() {
 		return pagoPorVerificar;
+	}
+
+	public String getMotivoCancelacion() {
+		return motivoCancelacion;
+	}
+
+	public Long getCanceladaPor() {
+		return canceladaPor;
+	}
+
+	public Instant getCanceladaEn() {
+		return canceladaEn;
 	}
 
 	public String getCorrelationId() {
