@@ -149,19 +149,29 @@ public class ReservaTransacciones {
 	 * El pago se aprobó. Antes de confirmar se revalida que las fechas sigan retenidas para esta
 	 * reserva (MA-69, escenario 1): si la retención venció y otra reserva las tomó, se compensa y
 	 * el cobro debe devolverse.
+	 * <p>
+	 * Cuando hay que devolver, la reserva queda con el pago por verificar en esta misma
+	 * transacción: si el proceso cae antes de pedir la devolución, el conciliador la retoma.
 	 */
 	@Transactional
 	public Desenlace confirmar(Long reservaId, String referenciaPago) {
 		Reserva reserva = bloquear(reservaId);
+		if (reserva.getEstado() == EstadoReserva.CONFIRMADA && referenciaPago.equals(reserva.getReferenciaPago())) {
+			// Otro reintento ya la confirmó con este mismo cobro: no hay nada que devolver
+			return new Desenlace(respuestaGuardada(reserva), false);
+		}
 		if (reserva.getEstado() != EstadoReserva.PENDIENTE_PAGO) {
 			// El conciliador ya la resolvió (por ejemplo, venció la retención): el cobro sobra
+			if (reserva.getEstado() == EstadoReserva.PAGO_FALLIDO) {
+				reserva.marcarPagoPorVerificar(reloj.instant());
+			}
 			return new Desenlace(respuestaGuardada(reserva), true);
 		}
 		PeriodoReservado fechas = fechasDe(reservaId);
 		if (fechas.getLiberadoEn() != null) {
 			RespuestaReserva respuesta = fallar(reserva, fechas, HttpStatus.CONFLICT, "FECHAS_NO_DISPONIBLES",
 					"Las fechas dejaron de estar disponibles mientras se procesaba el pago. El cobro se devolverá.",
-					referenciaPago, false);
+					referenciaPago, true);
 			return new Desenlace(respuesta, true);
 		}
 		Instant ahora = reloj.instant();
@@ -178,17 +188,23 @@ public class ReservaTransacciones {
 	/**
 	 * El pago falló, no respondió o la retención venció (compensación, SD-03.1): la reserva pasa
 	 * a PAGO_FALLIDO y las fechas se liberan en la misma transacción.
+	 * <p>
+	 * Si la reserva ya no estaba pendiente (otro flujo la resolvió primero), no cambia nada y no
+	 * hay que devolver. Si sí se compensa y hubo cobro, la devolución queda pendiente en esta
+	 * misma transacción hasta que la pasarela la acepte.
+	 *
+	 * @param hayCobro la pasarela confirmó que sí cobró: hay que devolver
 	 */
 	@Transactional
 	public Desenlace compensar(Long reservaId, HttpStatus estadoHttp, String codigo, String detalle,
-			String referenciaPago, boolean porVerificar) {
+			String referenciaPago, boolean porVerificar, boolean hayCobro) {
 		Reserva reserva = bloquear(reservaId);
 		if (reserva.getEstado() != EstadoReserva.PENDIENTE_PAGO) {
 			return new Desenlace(respuestaGuardada(reserva), false);
 		}
 		RespuestaReserva respuesta = fallar(reserva, fechasDe(reservaId), estadoHttp, codigo, detalle, referenciaPago,
-				porVerificar);
-		return new Desenlace(respuesta, false);
+				porVerificar || hayCobro);
+		return new Desenlace(respuesta, hayCobro);
 	}
 
 	private RespuestaReserva fallar(Reserva reserva, PeriodoReservado fechas, HttpStatus estadoHttp, String codigo,

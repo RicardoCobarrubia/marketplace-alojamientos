@@ -1,11 +1,10 @@
 package co.edu.unbosque.marketplace.pagos.infraestructura;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -24,7 +23,7 @@ import co.edu.unbosque.marketplace.pagos.dominio.SolicitudCobro;
 public class PasarelaSimulada implements PasarelaPagos {
 
 	private final Map<String, ResultadoPago> cobros = new ConcurrentHashMap<>();
-	private final List<String> devoluciones = new CopyOnWriteArrayList<>();
+	private final Set<String> devoluciones = ConcurrentHashMap.newKeySet();
 
 	@Override
 	public ResultadoPago cobrar(SolicitudCobro solicitud) {
@@ -40,9 +39,8 @@ public class PasarelaSimulada implements PasarelaPagos {
 
 	@Override
 	public void devolver(String referencia, BigDecimal monto, String claveIdempotencia) {
-		if (!devoluciones.contains(claveIdempotencia)) {
-			devoluciones.add(claveIdempotencia);
-		}
+		// Un conjunto concurrente: dos llamadas simultáneas con la misma clave cuentan una vez
+		devoluciones.add(claveIdempotencia);
 	}
 
 	/** Cobros hechos; lo usan las pruebas para comprobar que un reintento no cobra dos veces. */

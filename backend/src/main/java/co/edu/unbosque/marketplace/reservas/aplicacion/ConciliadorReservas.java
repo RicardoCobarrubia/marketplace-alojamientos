@@ -59,6 +59,9 @@ public class ConciliadorReservas {
 				verificadas++;
 			} catch (PasarelaNoDisponibleException e) {
 				log.warn("La pasarela sigue sin responder para la reserva {}", reservaId);
+			} catch (RuntimeException e) {
+				// Una reserva con problemas no detiene la verificación de las demás
+				log.error("No se pudo verificar el pago de la reserva {}", reservaId, e);
 			}
 		}
 		return verificadas;

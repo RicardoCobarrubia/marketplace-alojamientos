@@ -14,6 +14,7 @@ import java.util.TreeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -79,7 +80,9 @@ public class ReservaService {
 		Reserva reserva;
 		try {
 			reserva = transacciones.iniciar(huesped, clave, huella, solicitud);
-		} catch (DataIntegrityViolationException e) {
+		} catch (DataIntegrityViolationException | ConcurrencyFailureException e) {
+			// Clave repetida, fechas tomadas por otra reserva (ADR-003) o, con solicitudes
+			// simultáneas, un interbloqueo que PostgreSQL resolvió abortando esta transacción
 			Optional<ClaveIdempotencia> previa = transacciones.buscarClave(huesped.getId(), clave);
 			if (previa.isPresent()) {
 				return reintento(previa.get(), huella);
@@ -114,7 +117,7 @@ public class ReservaService {
 		}
 		return transacciones.compensar(reservaId, HttpStatus.PAYMENT_REQUIRED, "PAGO_RECHAZADO",
 				"La pasarela rechazó el pago" + (resultado.detalle() == null ? "." : ": " + resultado.detalle()),
-				resultado.referencia(), false).respuesta();
+				resultado.referencia(), false, false).respuesta();
 	}
 
 	/**
@@ -129,11 +132,11 @@ public class ReservaService {
 			real = pasarela.consultar(clavePago, total);
 		} catch (PasarelaNoDisponibleException e) {
 			return transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA, detalle,
-					null, true).respuesta();
+					null, true, false).respuesta();
 		}
 		Desenlace desenlace = transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA,
-				detalle, real.referencia(), false);
-		if (real.aprobado()) {
+				detalle, real.referencia(), false, real.aprobado());
+		if (desenlace.requiereDevolucion()) {
 			devolver(reservaId, real.referencia(), total);
 		}
 		return desenlace.respuesta();
@@ -144,6 +147,7 @@ public class ReservaService {
 		try {
 			pasarela.devolver(referencia, total, clavePago(reservaId));
 			log.info("Devolución solicitada para la reserva {}", reservaId);
+			transacciones.marcarPagoVerificado(reservaId, referencia);
 		} catch (PasarelaNoDisponibleException e) {
 			log.warn("No se pudo solicitar la devolución de la reserva {}: {}", reservaId, e.getMessage());
 			transacciones.marcarPagoPorVerificar(reservaId);
@@ -187,13 +191,13 @@ public class ReservaService {
 			real = pasarela.consultar(clavePago(reservaId), total);
 		} catch (PasarelaNoDisponibleException e) {
 			return transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, SIN_RESPUESTA,
-					"No se pudo confirmar el pago con la pasarela.", null, true).respuesta();
+					"No se pudo confirmar el pago con la pasarela.", null, true, false).respuesta();
 		}
 		if (real.aprobado()) {
 			return aplicar(reservaId, total, real);
 		}
 		return transacciones.compensar(reservaId, HttpStatus.PAYMENT_REQUIRED, "PAGO_NO_REALIZADO",
-				"El pago no se completó.", null, false).respuesta();
+				"El pago no se completó.", null, false, false).respuesta();
 	}
 
 	/**
@@ -208,12 +212,13 @@ public class ReservaService {
 			real = pasarela.consultar(clavePago(reservaId), total);
 		} catch (PasarelaNoDisponibleException e) {
 			transacciones.compensar(reservaId, HttpStatus.GATEWAY_TIMEOUT, RETENCION_VENCIDA,
-					DETALLE_RETENCION_VENCIDA, null, true);
+					DETALLE_RETENCION_VENCIDA, null, true, false);
 			return;
 		}
-		transacciones.compensar(reservaId, HttpStatus.CONFLICT, RETENCION_VENCIDA,
-				DETALLE_RETENCION_VENCIDA, real.referencia(), false);
-		if (real.aprobado()) {
+		// Si mientras tanto otro flujo la confirmó, compensar no cambia nada y no se devuelve
+		Desenlace desenlace = transacciones.compensar(reservaId, HttpStatus.CONFLICT, RETENCION_VENCIDA,
+				DETALLE_RETENCION_VENCIDA, real.referencia(), false, real.aprobado());
+		if (desenlace.requiereDevolucion()) {
 			devolver(reservaId, real.referencia(), total);
 		}
 	}
@@ -221,7 +226,7 @@ public class ReservaService {
 	/** Un pago quedó en duda: si hubo cobro, se pide la devolución (MA-68, escenario 3). */
 	void verificarPago(Reserva reserva) {
 		ResultadoPago real = pasarela.consultar(clavePago(reserva.getId()), reserva.getTotal());
-		if (real.aprobado()) {
+		if (real.aprobado() && reserva.getEstado() != EstadoReserva.CONFIRMADA) {
 			pasarela.devolver(real.referencia(), reserva.getTotal(), clavePago(reserva.getId()));
 			log.info("Devolución solicitada para la reserva {} (pago verificado)", reserva.getId());
 		}

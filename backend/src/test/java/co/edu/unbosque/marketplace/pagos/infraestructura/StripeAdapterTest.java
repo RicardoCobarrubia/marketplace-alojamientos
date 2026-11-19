@@ -41,7 +41,12 @@ class StripeAdapterTest {
 	void iniciar() throws IOException {
 		servidor = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		servidor.createContext("/v1/payment_intents", this::intenciones);
-		servidor.createContext("/v1/refunds", intercambio -> responder(intercambio, 200, "{\"id\":\"re_1\"}"));
+		servidor.createContext("/v1/refunds", intercambio -> {
+			peticiones.add(intercambio.getRequestMethod() + " " + intercambio.getRequestURI().getPath() + " "
+					+ intercambio.getRequestHeaders().getFirst("Idempotency-Key") + " "
+					+ new String(intercambio.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+			responder(intercambio, 200, "{\"id\":\"re_1\"}");
+		});
 		servidor.start();
 		adaptador = new StripeAdapter(JsonMapper.builder().build(),
 				"http://127.0.0.1:" + servidor.getAddress().getPort(), "sk_test_prueba", "cop", "pm_card_visa",
@@ -140,8 +145,35 @@ class StripeAdapterTest {
 	@Test
 	void devolverEnviaLaDevolucionDelCobro() {
 		adaptador.devolver("pi_1", MONTO, "reserva-7");
-		// El servidor responde 200: no hay excepción
-		assertThat(servidor.getAddress().getPort()).isPositive();
+
+		assertThat(peticiones).singleElement().asString()
+				.startsWith("POST /v1/refunds reserva-7:devolucion ")
+				.contains("payment_intent=pi_1", "amount=15000050");
+	}
+
+	@Test
+	void exigeHttpsFueraDeEsteEquipo() {
+		JsonMapper json = JsonMapper.builder().build();
+		Duration timeout = Duration.ofSeconds(1);
+
+		assertThatThrownBy(() -> new StripeAdapter(json, "http://api.stripe.com", "sk_test_x", "cop", "pm_card_visa",
+				timeout)).isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void losDosPasosDelCobroCompartenElMismoLimiteDeTiempo() {
+		// Cada paso solo tarda 300 ms, pero juntos superan el límite de 500 ms
+		demoraMs = 300;
+		servidor.removeContext("/v1/payment_intents");
+		servidor.createContext("/v1/payment_intents", intercambio -> {
+			intercambio.getRequestBody().readAllBytes();
+			esperar();
+			String estado = intercambio.getRequestURI().getPath().endsWith("/confirm") ? "succeeded" : "requires_confirmation";
+			responder(intercambio, 200, "{\"id\":\"pi_1\",\"status\":\"" + estado + "\"}");
+		});
+		SolicitudCobro solicitud = new SolicitudCobro("reserva-7", MONTO, "Reserva 7");
+
+		assertThatThrownBy(() -> adaptador.cobrar(solicitud)).isInstanceOf(PasarelaNoDisponibleException.class);
 	}
 
 	@Test

@@ -40,7 +40,7 @@ public record ReservaDTO(
 		@Positive(message = "El número de huéspedes debe ser mayor que cero.")
 		Integer huespedes,
 
-		Set<Long> servicioIds,
+		Set<@NotNull(message = "Un servicio adicional está vacío.") Long> servicioIds,
 
 		@JsonProperty(access = Access.READ_ONLY)
 		EstadoReserva estado,

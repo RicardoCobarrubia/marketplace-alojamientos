@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
@@ -131,7 +132,7 @@ class ReservaServiceTest {
 		seCrea();
 		when(pasarela.cobrar(any(SolicitudCobro.class))).thenReturn(ResultadoPago.rechazado("pi_1", "Sin fondos"));
 		when(transacciones.compensar(eq(50L), eq(HttpStatus.PAYMENT_REQUIRED), eq("PAGO_RECHAZADO"), any(),
-				eq("pi_1"), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
+				eq("pi_1"), eq(false), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
 
 		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(FALLIDA);
 	}
@@ -146,7 +147,7 @@ class ReservaServiceTest {
 		when(pasarela.cobrar(any(SolicitudCobro.class))).thenThrow(new PasarelaNoDisponibleException("timeout"));
 		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
 		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), eq("PASARELA_SIN_RESPUESTA"), any(),
-				eq("pi_1"), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
+				eq("pi_1"), eq(false), eq(true))).thenReturn(new Desenlace(FALLIDA, true));
 
 		servicio.reservar(huesped, CLAVE, solicitud);
 
@@ -158,7 +159,7 @@ class ReservaServiceTest {
 		seCrea();
 		when(pasarela.cobrar(any(SolicitudCobro.class))).thenThrow(new PasarelaNoDisponibleException("timeout"));
 		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.noCobrado());
-		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(false)))
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(false), eq(false)))
 				.thenReturn(new Desenlace(FALLIDA, false));
 
 		servicio.reservar(huesped, CLAVE, solicitud);
@@ -171,7 +172,7 @@ class ReservaServiceTest {
 		seCrea();
 		when(pasarela.cobrar(any(SolicitudCobro.class))).thenThrow(new PasarelaNoDisponibleException("timeout"));
 		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenThrow(new PasarelaNoDisponibleException("caída"));
-		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(true)))
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.GATEWAY_TIMEOUT), any(), any(), isNull(), eq(true), eq(false)))
 				.thenReturn(new Desenlace(FALLIDA, false));
 
 		assertThat(servicio.reservar(huesped, CLAVE, solicitud)).isEqualTo(FALLIDA);
@@ -269,12 +270,24 @@ class ReservaServiceTest {
 	@Test
 	void alVencerLaRetencionSeCompensaYSeDevuelveSiAlcanzoACobrar() {
 		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(transacciones.compensar(eq(50L), eq(HttpStatus.CONFLICT), eq("RETENCION_VENCIDA"), any(), eq("pi_1"),
+				eq(false), eq(true))).thenReturn(new Desenlace(FALLIDA, true));
 
 		servicio.vencer(reserva);
 
-		verify(transacciones).compensar(eq(50L), eq(HttpStatus.CONFLICT), eq("RETENCION_VENCIDA"), any(), eq("pi_1"),
-				eq(false));
 		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO);
+		verify(transacciones).marcarPagoVerificado(50L, "pi_1");
+	}
+
+	@Test
+	void siOtroFlujoLaConfirmoAlVencerNoSeDevuelve() {
+		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+		when(transacciones.compensar(eq(50L), any(), any(), any(), any(), anyBoolean(), anyBoolean()))
+				.thenReturn(new Desenlace(CREADA, false));
+
+		servicio.vencer(reserva);
+
+		verify(pasarela, never()).devolver(any(), any(), any());
 	}
 
 	@Test
@@ -283,7 +296,8 @@ class ReservaServiceTest {
 
 		servicio.vencer(reserva);
 
-		verify(transacciones).compensar(eq(50L), any(), eq("RETENCION_VENCIDA"), any(), isNull(), eq(true));
+		verify(transacciones).compensar(eq(50L), any(), eq("RETENCION_VENCIDA"), any(), isNull(), eq(true),
+				eq(false));
 	}
 
 	@Test
@@ -294,6 +308,27 @@ class ReservaServiceTest {
 
 		verify(pasarela).devolver("pi_1", reserva.getTotal(), CLAVE_PAGO);
 		verify(transacciones).marcarPagoVerificado(50L, "pi_1");
+	}
+
+	@Test
+	void verificarUnPagoDeUnaReservaConfirmadaNoLoDevuelve() {
+		reserva.confirmar("pi_1", AHORA);
+		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.aprobado("pi_1"));
+
+		servicio.verificarPago(reserva);
+
+		verify(pasarela, never()).devolver(any(), any(), any());
+	}
+
+	@Test
+	void unInterbloqueoEntreReservasSimultaneasEsUnConflictoControlado() {
+		when(transacciones.iniciar(any(), any(), any(), any()))
+				.thenThrow(new CannotAcquireLockException("deadlock detected"));
+		when(transacciones.buscarClave(2L, CLAVE)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servicio.reservar(huesped, CLAVE, solicitud))
+				.isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "FECHAS_NO_DISPONIBLES");
 	}
 
 	@Test
@@ -310,7 +345,7 @@ class ReservaServiceTest {
 	void recuperarSinCobroCompensa() {
 		when(pasarela.consultar(CLAVE_PAGO, reserva.getTotal())).thenReturn(ResultadoPago.noCobrado());
 		when(transacciones.compensar(eq(50L), eq(HttpStatus.PAYMENT_REQUIRED), eq("PAGO_NO_REALIZADO"), any(),
-				isNull(), anyBoolean())).thenReturn(new Desenlace(FALLIDA, false));
+				isNull(), anyBoolean(), eq(false))).thenReturn(new Desenlace(FALLIDA, false));
 
 		assertThat(servicio.recuperar(reserva)).isEqualTo(FALLIDA);
 	}

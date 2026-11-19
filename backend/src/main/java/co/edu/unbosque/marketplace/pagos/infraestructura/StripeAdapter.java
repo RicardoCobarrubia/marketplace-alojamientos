@@ -10,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -65,6 +66,7 @@ public class StripeAdapter implements PasarelaPagos {
 		if (claveSecreta == null || claveSecreta.isBlank()) {
 			throw new IllegalStateException("Falta marketplace.pagos.stripe.clave-secreta (variable STRIPE_SECRET_KEY).");
 		}
+		exigirHttps(urlBase);
 		this.json = json;
 		this.urlBase = urlBase;
 		this.claveSecreta = claveSecreta;
@@ -74,11 +76,16 @@ public class StripeAdapter implements PasarelaPagos {
 		this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
 	}
 
+	/**
+	 * Los dos pasos comparten el mismo límite de tiempo ({@code marketplace.pagos.timeout}): la
+	 * confirmación solo usa lo que dejó la creación.
+	 */
 	@Override
 	public ResultadoPago cobrar(SolicitudCobro solicitud) {
-		String id = crear(solicitud.claveIdempotencia(), solicitud.monto());
+		Instant limite = Instant.now().plus(timeout);
+		String id = crear(solicitud.claveIdempotencia(), solicitud.monto(), limite);
 		Respuesta confirmacion = enviar("POST", "/v1/payment_intents/" + id + "/confirm", Map.of(),
-				solicitud.claveIdempotencia() + ":confirmar");
+				solicitud.claveIdempotencia() + ":confirmar", limite);
 		if (confirmacion.estado() == 402 || confirmacion.estado() == 400) {
 			// Stripe rechazó la tarjeta: responde un error con el motivo
 			return ResultadoPago.rechazado(id, confirmacion.cuerpo().path("error").path("message").asString(""));
@@ -90,8 +97,9 @@ public class StripeAdapter implements PasarelaPagos {
 
 	@Override
 	public ResultadoPago consultar(String claveIdempotencia, BigDecimal monto) {
-		String id = crear(claveIdempotencia, monto);
-		Respuesta actual = enviar("GET", "/v1/payment_intents/" + id, Map.of(), null);
+		Instant limite = Instant.now().plus(timeout);
+		String id = crear(claveIdempotencia, monto, limite);
+		Respuesta actual = enviar("GET", "/v1/payment_intents/" + id, Map.of(), null, limite);
 		verificar(actual);
 		return EXITOSO.equals(actual.cuerpo().path("status").asString(""))
 				? ResultadoPago.aprobado(id)
@@ -103,12 +111,12 @@ public class StripeAdapter implements PasarelaPagos {
 		Map<String, String> datos = new LinkedHashMap<>();
 		datos.put("payment_intent", referencia);
 		datos.put("amount", centavos(monto));
-		verificar(enviar("POST", "/v1/refunds", datos, claveIdempotencia + ":devolucion"));
+		verificar(enviar("POST", "/v1/refunds", datos, claveIdempotencia + ":devolucion", Instant.now().plus(timeout)));
 		log.info("Devolución solicitada a Stripe (cobro {})", referencia);
 	}
 
 	/** Crea el PaymentIntent sin confirmar. Con la misma clave, Stripe devuelve el mismo. */
-	private String crear(String claveIdempotencia, BigDecimal monto) {
+	private String crear(String claveIdempotencia, BigDecimal monto, Instant limite) {
 		Map<String, String> datos = new LinkedHashMap<>();
 		datos.put("amount", centavos(monto));
 		datos.put("currency", moneda);
@@ -116,14 +124,19 @@ public class StripeAdapter implements PasarelaPagos {
 		datos.put("payment_method", metodoPago);
 		datos.put("description", "Reserva " + claveIdempotencia);
 		datos.put("metadata[clave_idempotencia]", claveIdempotencia);
-		Respuesta creacion = enviar("POST", "/v1/payment_intents", datos, claveIdempotencia + ":crear");
+		Respuesta creacion = enviar("POST", "/v1/payment_intents", datos, claveIdempotencia + ":crear", limite);
 		verificar(creacion);
 		return creacion.cuerpo().path("id").asString();
 	}
 
-	private Respuesta enviar(String metodo, String ruta, Map<String, String> datos, String claveIdempotencia) {
+	private Respuesta enviar(String metodo, String ruta, Map<String, String> datos, String claveIdempotencia,
+			Instant limite) {
+		Duration restante = Duration.between(Instant.now(), limite);
+		if (restante.isNegative() || restante.isZero()) {
+			throw new PasarelaNoDisponibleException("Se agotó el tiempo para hablar con Stripe.");
+		}
 		HttpRequest.Builder peticion = HttpRequest.newBuilder(URI.create(urlBase + ruta))
-				.timeout(timeout)
+				.timeout(restante)
 				.header("Authorization", "Bearer " + claveSecreta);
 		if (claveIdempotencia != null) {
 			peticion.header("Idempotency-Key", claveIdempotencia);
@@ -144,6 +157,15 @@ public class StripeAdapter implements PasarelaPagos {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new PasarelaNoDisponibleException("Se interrumpió la llamada a Stripe.", e);
+		}
+	}
+
+	/** La clave secreta solo viaja cifrada; HTTP se admite únicamente hacia este mismo equipo (pruebas). */
+	private static void exigirHttps(String urlBase) {
+		URI uri = URI.create(urlBase);
+		boolean local = "localhost".equals(uri.getHost()) || "127.0.0.1".equals(uri.getHost());
+		if (!"https".equals(uri.getScheme()) && !local) {
+			throw new IllegalStateException("La URL de Stripe debe usar HTTPS: " + urlBase);
 		}
 	}
 
