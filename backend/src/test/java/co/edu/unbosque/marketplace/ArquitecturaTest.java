@@ -51,11 +51,17 @@ class ArquitecturaTest {
 					"..marketplace.notificaciones..");
 
 	/**
-	 * ADR-001 y ADR-006: el dominio y la aplicación no conocen el SDK de Stripe; solo el adaptador
-	 * de pagos lo usa, así que cambiar de proveedor toca un componente.
+	 * ADR-006 (ASR-04): fuera del módulo de pagos nadie usa los adaptadores, solo el puerto
+	 * {@code PasarelaPagos}. Así cambiar de proveedor toca un solo componente.
 	 */
 	@ArchTest
-	static final ArchRule pagosAislados = noClasses()
+	static final ArchRule adaptadoresDePagoAislados = noClasses()
+			.that().resideOutsideOfPackage("..marketplace.pagos..")
+			.should().dependOnClassesThat().resideInAPackage("..marketplace.pagos.infraestructura..");
+
+	/** ADR-001: el dominio y la aplicación no conocen el SDK de Stripe. */
+	@ArchTest
+	static final ArchRule sinSdkDeStripe = noClasses()
 			.that().resideInAnyPackage("..dominio..", "..aplicacion..")
 			.should().dependOnClassesThat().resideInAPackage("com.stripe..")
 			.allowEmptyShould(true);
