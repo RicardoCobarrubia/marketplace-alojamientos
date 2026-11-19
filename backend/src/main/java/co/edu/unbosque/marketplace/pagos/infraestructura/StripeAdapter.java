@@ -48,8 +48,11 @@ public class StripeAdapter implements PasarelaPagos {
 
 	private static final Logger log = LoggerFactory.getLogger(StripeAdapter.class);
 	private static final String EXITOSO = "succeeded";
-	/** Estados de una devolución que ya está hecha o en camino: no se pide otra. */
-	private static final Set<String> DEVOLUCION_VIGENTE = Set.of("succeeded", "pending", "requires_action");
+	private static final String ESTADO = "status";
+	/** Estados en que Stripe dejó el PaymentIntent tras un intento de cobro rechazado. */
+	private static final Set<String> COBRO_RECHAZADO = Set.of("requires_payment_method", "canceled");
+	/** Estados de una devolución que ya está hecha o en camino: ese monto no se vuelve a pedir. */
+	private static final Set<String> DEVOLUCION_VIGENTE = Set.of(EXITOSO, "pending", "requires_action");
 	/** Monedas sin decimales en Stripe: el adaptador solo maneja monedas con centavos, como COP. */
 	private static final Set<String> SIN_DECIMALES = Set.of("bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga",
 			"pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf");
@@ -88,7 +91,7 @@ public class StripeAdapter implements PasarelaPagos {
 	@Override
 	public String preparar(SolicitudCobro solicitud) {
 		Map<String, String> datos = new LinkedHashMap<>();
-		datos.put("amount", centavos(solicitud.monto()));
+		datos.put("amount", Long.toString(centavos(solicitud.monto())));
 		datos.put("currency", moneda);
 		datos.put("payment_method_types[]", "card");
 		datos.put("payment_method", metodoPago);
@@ -102,7 +105,7 @@ public class StripeAdapter implements PasarelaPagos {
 
 	@Override
 	public ResultadoPago cobrar(String referencia, SolicitudCobro solicitud) {
-		Respuesta confirmacion = enviar("POST", "/v1/payment_intents/" + referencia + "/confirm", Map.of(),
+		Respuesta confirmacion = enviar("POST", "/v1/payment_intents/" + codificar(referencia) + "/confirm", Map.of(),
 				solicitud.claveIdempotencia() + ":confirmar", limite());
 		JsonNode error = confirmacion.cuerpo().path("error");
 		if (confirmacion.estado() == 402 || "card_error".equals(error.path("type").asString(""))) {
@@ -110,33 +113,49 @@ public class StripeAdapter implements PasarelaPagos {
 			return ResultadoPago.rechazado(referencia, error.path("message").asString(""));
 		}
 		verificar(confirmacion);
-		String estado = confirmacion.cuerpo().path("status").asString("");
-		return EXITOSO.equals(estado) ? ResultadoPago.aprobado(referencia) : ResultadoPago.rechazado(referencia, estado);
+		String estado = confirmacion.cuerpo().path(ESTADO).asString("");
+		if (EXITOSO.equals(estado)) {
+			return ResultadoPago.aprobado(referencia);
+		}
+		if (COBRO_RECHAZADO.contains(estado)) {
+			return ResultadoPago.rechazado(referencia, estado);
+		}
+		// processing, requires_action o un estado desconocido: no se sabe si cobró, se consulta después
+		throw new PasarelaNoDisponibleException("Stripe dejó el cobro en estado '" + estado + "'.");
 	}
 
 	@Override
 	public ResultadoPago consultar(String referencia) {
 		Respuesta actual = enviar("GET", "/v1/payment_intents/" + codificar(referencia), Map.of(), null, limite());
 		verificar(actual);
-		return EXITOSO.equals(actual.cuerpo().path("status").asString(""))
+		return EXITOSO.equals(actual.cuerpo().path(ESTADO).asString(""))
 				? ResultadoPago.aprobado(referencia)
 				: ResultadoPago.noCobrado();
 	}
 
 	@Override
 	public void devolver(String referencia, BigDecimal monto, String claveIdempotencia, int intento) {
-		Respuesta existentes = enviar("GET", "/v1/refunds?limit=10&payment_intent=" + codificar(referencia), Map.of(),
-				null, limite());
+		Respuesta existentes = enviar("GET", "/v1/refunds?limit=100&payment_intent=" + codificar(referencia),
+				Map.of(), null, limite());
 		verificar(existentes);
+		if (existentes.cuerpo().path("has_more").asBoolean(false)) {
+			// No se ven todas las devoluciones: sin el saldo exacto no se pide nada y queda por verificar
+			throw new PasarelaNoDisponibleException("El cobro " + referencia + " tiene demasiadas devoluciones.");
+		}
+		long yaDevuelto = 0;
 		for (JsonNode devolucion : existentes.cuerpo().path("data")) {
-			if (DEVOLUCION_VIGENTE.contains(devolucion.path("status").asString(""))) {
-				log.info("El cobro {} ya tiene una devolución", referencia);
-				return;
+			if (DEVOLUCION_VIGENTE.contains(devolucion.path(ESTADO).asString(""))) {
+				yaDevuelto += devolucion.path("amount").asLong(0);
 			}
+		}
+		long pendiente = centavos(monto) - yaDevuelto;
+		if (pendiente <= 0) {
+			log.info("El cobro {} ya está devuelto o en proceso de devolución", referencia);
+			return;
 		}
 		Map<String, String> datos = new LinkedHashMap<>();
 		datos.put("payment_intent", referencia);
-		datos.put("amount", centavos(monto));
+		datos.put("amount", Long.toString(pendiente));
 		verificar(enviar("POST", "/v1/refunds", datos, claveIdempotencia + ":devolucion:" + intento, limite()));
 		log.info("Devolución solicitada a Stripe (cobro {}, intento {})", referencia, intento);
 	}
@@ -210,8 +229,8 @@ public class StripeAdapter implements PasarelaPagos {
 	}
 
 	/** Stripe recibe los montos en la unidad mínima de la moneda (centavos). */
-	private static String centavos(BigDecimal monto) {
-		return monto.movePointRight(2).setScale(0, RoundingMode.HALF_UP).toPlainString();
+	private static long centavos(BigDecimal monto) {
+		return monto.movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
 	}
 
 	private record Respuesta(int estado, JsonNode cuerpo) {
