@@ -6,8 +6,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import co.edu.unbosque.marketplace.pagos.dominio.PasarelaPagos;
 import co.edu.unbosque.marketplace.pagos.dominio.ResultadoPago;
@@ -16,10 +14,9 @@ import co.edu.unbosque.marketplace.pagos.dominio.SolicitudCobro;
 /**
  * Adaptador simulado (ADR-006): aprueba todos los cobros y los guarda en memoria por clave de
  * idempotencia. Es el proveedor por defecto en desarrollo y en las pruebas; en producción se
- * usa {@link StripeAdapter} con {@code marketplace.pagos.proveedor=stripe}.
+ * usa {@link StripeAdapter} con {@code marketplace.pagos.proveedor=stripe}. Lo crea
+ * {@link PagosConfig}.
  */
-@Component
-@ConditionalOnProperty(name = "marketplace.pagos.proveedor", havingValue = "simulado", matchIfMissing = true)
 public class PasarelaSimulada implements PasarelaPagos {
 
 	private final Map<String, ResultadoPago> cobros = new ConcurrentHashMap<>();

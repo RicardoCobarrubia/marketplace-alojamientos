@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.parser.PartTree;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 
@@ -28,7 +29,7 @@ class RepositoriosTest {
 				.withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
 				.importPackages("co.edu.unbosque.marketplace").stream()
 				.filter(clase -> clase.isInterface() && clase.isAssignableTo(JpaRepository.class))
-				.<Class<?>>map(clase -> clase.reflect())
+				.<Class<?>>map(JavaClass::reflect)
 				.toList();
 		assertThat(repositorios).hasSizeGreaterThan(5);
 

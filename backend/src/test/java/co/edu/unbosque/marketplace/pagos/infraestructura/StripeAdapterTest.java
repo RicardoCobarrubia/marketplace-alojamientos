@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
@@ -106,9 +108,10 @@ class StripeAdapterTest {
 		esperarMs(demoraMs);
 	}
 
+	/** Simula la latencia de Stripe sin Thread.sleep: espera un evento que nunca llega. */
 	private static void esperarMs(long milisegundos) {
 		try {
-			Thread.sleep(milisegundos);
+			new CountDownLatch(1).await(milisegundos, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}
@@ -222,7 +225,7 @@ class StripeAdapterTest {
 	}
 
 	@Test
-	void unCuerpoQueNoTerminaDeLlegarTambienAgotaElPlazo() throws IOException {
+	void unCuerpoQueNoTerminaDeLlegarTambienAgotaElPlazo() {
 		servidor.createContext("/v1/lento", intercambio -> {
 			intercambio.getRequestBody().readAllBytes();
 			intercambio.sendResponseHeaders(200, 0);

@@ -47,7 +47,7 @@ import tools.jackson.databind.ObjectMapper;
  * PENDIENTE_PAGO y retiene las fechas.</li>
  * <li>Transacción 2 ({@link #confirmar} o {@link #compensar}): deja la reserva en CONFIRMADA o
  * PAGO_FALLIDO, bloquea o libera las fechas, guarda la respuesta de la clave y el evento del
- * outbox, todo junto.</li>
+ * outbox, en un solo paso.</li>
  * </ul>
  */
 @Service

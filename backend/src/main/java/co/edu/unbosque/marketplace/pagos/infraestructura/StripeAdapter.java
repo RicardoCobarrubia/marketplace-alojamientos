@@ -21,9 +21,6 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import co.edu.unbosque.marketplace.pagos.dominio.PasarelaNoDisponibleException;
 import co.edu.unbosque.marketplace.pagos.dominio.PasarelaPagos;
@@ -46,8 +43,6 @@ import tools.jackson.databind.ObjectMapper;
  * Para consultar se repite el paso 1 con la misma clave: Stripe devuelve el mismo
  * PaymentIntent sin crear otro, y se lee su estado actual.
  */
-@Component
-@ConditionalOnProperty(name = "marketplace.pagos.proveedor", havingValue = "stripe")
 public class StripeAdapter implements PasarelaPagos {
 
 	private static final Logger log = LoggerFactory.getLogger(StripeAdapter.class);
@@ -64,12 +59,9 @@ public class StripeAdapter implements PasarelaPagos {
 	private final String metodoPago;
 	private final Duration timeout;
 
-	public StripeAdapter(ObjectMapper json,
-			@Value("${marketplace.pagos.stripe.url-base:https://api.stripe.com}") String urlBase,
-			@Value("${marketplace.pagos.stripe.clave-secreta}") String claveSecreta,
-			@Value("${marketplace.pagos.moneda:cop}") String moneda,
-			@Value("${marketplace.pagos.stripe.metodo-pago:pm_card_visa}") String metodoPago,
-			@Value("${marketplace.pagos.timeout:PT10S}") Duration timeout) {
+	/** Lo crea {@link PagosConfig} cuando {@code marketplace.pagos.proveedor=stripe}. */
+	public StripeAdapter(ObjectMapper json, String urlBase, String claveSecreta, String moneda, String metodoPago,
+			Duration timeout) {
 		if (claveSecreta == null || claveSecreta.isBlank()) {
 			throw new IllegalStateException("Falta marketplace.pagos.stripe.clave-secreta (variable STRIPE_SECRET_KEY).");
 		}

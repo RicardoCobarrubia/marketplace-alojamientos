@@ -16,6 +16,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,7 @@ class ReservaIntegrationTest {
 	private static final LocalDate HOY = LocalDate.now(ZoneId.of("America/Bogota"));
 	private static final LocalDate LLEGADA = HOY.plusDays(10);
 	private static final LocalDate SALIDA = HOY.plusDays(13);
+	private static final Pattern RESERVA_ID = Pattern.compile("\"reservaId\":(\\d+)");
 
 	@TestConfiguration
 	static class Pasarela {
@@ -244,7 +247,9 @@ class ReservaIntegrationTest {
 				.andExpect(status().isPaymentRequired())
 				.andExpect(jsonPath("$.codigo").value("PAGO_RECHAZADO"))
 				.andReturn().getResponse().getContentAsString();
-		long id = Long.parseLong(respuesta.replaceAll(".*\"reservaId\":(\\d+).*", "$1"));
+		Matcher reservaId = RESERVA_ID.matcher(respuesta);
+		assertThat(reservaId.find()).isTrue();
+		long id = Long.parseLong(reservaId.group(1));
 
 		assertThat(estadoReserva(id)).isEqualTo("PAGO_FALLIDO");
 		disponibilidad().andExpect(jsonPath("$.disponible").value(true));
