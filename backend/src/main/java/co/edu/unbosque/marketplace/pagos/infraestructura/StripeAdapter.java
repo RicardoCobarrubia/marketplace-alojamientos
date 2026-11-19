@@ -49,6 +49,7 @@ public class StripeAdapter implements PasarelaPagos {
 	private static final Logger log = LoggerFactory.getLogger(StripeAdapter.class);
 	private static final String EXITOSO = "succeeded";
 	private static final String ESTADO = "status";
+	private static final String MONTO = "amount";
 	/** Estados en que Stripe dejó el PaymentIntent tras un intento de cobro rechazado. */
 	private static final Set<String> COBRO_RECHAZADO = Set.of("requires_payment_method", "canceled");
 	/** Estados de una devolución que ya está hecha o en camino: ese monto no se vuelve a pedir. */
@@ -91,7 +92,7 @@ public class StripeAdapter implements PasarelaPagos {
 	@Override
 	public String preparar(SolicitudCobro solicitud) {
 		Map<String, String> datos = new LinkedHashMap<>();
-		datos.put("amount", Long.toString(centavos(solicitud.monto())));
+		datos.put(MONTO, Long.toString(centavos(solicitud.monto())));
 		datos.put("currency", moneda);
 		datos.put("payment_method_types[]", "card");
 		datos.put("payment_method", metodoPago);
@@ -145,7 +146,7 @@ public class StripeAdapter implements PasarelaPagos {
 		long yaDevuelto = 0;
 		for (JsonNode devolucion : existentes.cuerpo().path("data")) {
 			if (DEVOLUCION_VIGENTE.contains(devolucion.path(ESTADO).asString(""))) {
-				yaDevuelto += devolucion.path("amount").asLong(0);
+				yaDevuelto += devolucion.path(MONTO).asLong(0);
 			}
 		}
 		long pendiente = centavos(monto) - yaDevuelto;
@@ -155,7 +156,7 @@ public class StripeAdapter implements PasarelaPagos {
 		}
 		Map<String, String> datos = new LinkedHashMap<>();
 		datos.put("payment_intent", referencia);
-		datos.put("amount", Long.toString(pendiente));
+		datos.put(MONTO, Long.toString(pendiente));
 		verificar(enviar("POST", "/v1/refunds", datos, claveIdempotencia + ":devolucion:" + intento, limite()));
 		log.info("Devolución solicitada a Stripe (cobro {}, intento {})", referencia, intento);
 	}
