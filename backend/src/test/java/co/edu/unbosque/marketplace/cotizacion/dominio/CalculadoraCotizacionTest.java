@@ -118,6 +118,29 @@ class CalculadoraCotizacionTest {
 	}
 
 	@Test
+	void cadaDescuentoSeRedondeaParaQueElDesgloseCuadre() {
+		ReglaDescuento conMilesimas = new ReglaDescuento() {
+			@Override
+			public String nombre() {
+				return "Con milésimas";
+			}
+
+			@Override
+			public BigDecimal calcular(long noches, BigDecimal subtotal, ConfiguracionCotizacion configuracion) {
+				return new BigDecimal("0.005");
+			}
+		};
+
+		Cotizacion cotizacion = new CalculadoraCotizacion(List.of(conMilesimas))
+				.calcular(alojamiento, 1, List.of(), CONFIGURACION);
+
+		assertThat(cotizacion.descuentos().get(0).valor()).isEqualByComparingTo("0.01").hasScaleOf(2);
+		// 250.000 - 0,01 + 40.000 = 289.999,99, más el 10 %
+		assertThat(cotizacion.total()).isEqualByComparingTo(cotizacion.subtotal()
+				.subtract(cotizacion.totalDescuentos()).add(cotizacion.limpieza()).add(cotizacion.tarifaServicio()));
+	}
+
+	@Test
 	void rechazaUnaEstadiaSinNoches() {
 		List<ServicioAdicional> sinServicios = List.of();
 

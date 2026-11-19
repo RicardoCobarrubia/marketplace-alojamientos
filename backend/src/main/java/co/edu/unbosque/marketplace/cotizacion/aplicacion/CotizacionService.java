@@ -121,7 +121,7 @@ public class CotizacionService {
 	// ─────────────────────────────────────────
 
 	private ConfiguracionCotizacion configuracionActual() {
-		return configuracionRepository.findById(ConfiguracionCotizacion.ID)
+		return configuracionRepository.findById(ConfiguracionCotizacion.ID_UNICO)
 				.orElseThrow(() -> new IllegalStateException("Falta la configuración de la cotización (migración V5)."));
 	}
 

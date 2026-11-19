@@ -41,7 +41,8 @@ public class CalculadoraCotizacion {
 		List<LineaDescuento> descuentos = new ArrayList<>();
 		BigDecimal totalDescuentos = BigDecimal.ZERO;
 		for (ReglaDescuento regla : reglasDescuento) {
-			BigDecimal valor = regla.calcular(noches, subtotal, configuracion);
+			// Cada descuento se redondea igual que el resto del desglose, para que las líneas cuadren con el total
+			BigDecimal valor = Dinero.redondear(regla.calcular(noches, subtotal, configuracion));
 			if (valor.signum() > 0) {
 				// Los descuentos juntos nunca dejan el subtotal en negativo
 				valor = valor.min(subtotal.subtract(totalDescuentos));

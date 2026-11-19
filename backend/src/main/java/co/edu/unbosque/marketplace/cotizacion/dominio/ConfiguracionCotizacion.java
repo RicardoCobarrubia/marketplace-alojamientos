@@ -17,7 +17,8 @@ import jakarta.persistence.Table;
 @Table(name = "configuracion_cotizacion")
 public class ConfiguracionCotizacion {
 
-	public static final short ID = 1;
+	/** La configuración es una sola fila con este id. */
+	public static final short ID_UNICO = 1;
 
 	@Id
 	private Short id;
@@ -44,7 +45,7 @@ public class ConfiguracionCotizacion {
 	/** Para pruebas y para armar la configuración sin base de datos. */
 	public ConfiguracionCotizacion(BigDecimal porcentajeTarifaServicio, BigDecimal porcentajeDescuentoEstadiaLarga,
 			int minimoNochesDescuento) {
-		this.id = ID;
+		this.id = ID_UNICO;
 		this.porcentajeTarifaServicio = porcentajeTarifaServicio;
 		this.porcentajeDescuentoEstadiaLarga = porcentajeDescuentoEstadiaLarga;
 		this.minimoNochesDescuento = minimoNochesDescuento;

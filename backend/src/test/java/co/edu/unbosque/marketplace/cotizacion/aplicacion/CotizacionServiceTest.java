@@ -70,7 +70,7 @@ class CotizacionServiceTest {
 	}
 
 	private void hayConfiguracion() {
-		when(configuracionRepository.findById(ConfiguracionCotizacion.ID)).thenReturn(Optional.of(configuracion));
+		when(configuracionRepository.findById(ConfiguracionCotizacion.ID_UNICO)).thenReturn(Optional.of(configuracion));
 	}
 
 	@Test
@@ -152,7 +152,7 @@ class CotizacionServiceTest {
 
 	@Test
 	void sinConfiguracionFallaConUnErrorClaro() {
-		when(configuracionRepository.findById(ConfiguracionCotizacion.ID)).thenReturn(Optional.empty());
+		when(configuracionRepository.findById(ConfiguracionCotizacion.ID_UNICO)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> servicio.obtenerConfiguracion()).isInstanceOf(IllegalStateException.class);
 	}
