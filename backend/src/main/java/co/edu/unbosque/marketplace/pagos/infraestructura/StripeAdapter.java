@@ -1,6 +1,5 @@
 package co.edu.unbosque.marketplace.pagos.infraestructura;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
@@ -13,6 +12,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -48,6 +52,9 @@ public class StripeAdapter implements PasarelaPagos {
 
 	private static final Logger log = LoggerFactory.getLogger(StripeAdapter.class);
 	private static final String EXITOSO = "succeeded";
+	/** Monedas sin decimales en Stripe: el adaptador solo maneja monedas con centavos, como COP. */
+	private static final Set<String> SIN_DECIMALES = Set.of("bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga",
+			"pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf");
 
 	private final HttpClient http;
 	private final ObjectMapper json;
@@ -65,6 +72,13 @@ public class StripeAdapter implements PasarelaPagos {
 			@Value("${marketplace.pagos.timeout:PT10S}") Duration timeout) {
 		if (claveSecreta == null || claveSecreta.isBlank()) {
 			throw new IllegalStateException("Falta marketplace.pagos.stripe.clave-secreta (variable STRIPE_SECRET_KEY).");
+		}
+		if (!claveSecreta.startsWith("sk_test_") && !claveSecreta.startsWith("rk_test_")) {
+			// El proyecto solo simula pagos: una clave de modo activo podría cobrar de verdad
+			throw new IllegalStateException("Solo se admiten claves de Stripe en modo prueba (sk_test_...).");
+		}
+		if (SIN_DECIMALES.contains(moneda.toLowerCase())) {
+			throw new IllegalStateException("La moneda " + moneda + " no tiene centavos; el adaptador no la admite.");
 		}
 		exigirHttps(urlBase);
 		this.json = json;
@@ -86,9 +100,10 @@ public class StripeAdapter implements PasarelaPagos {
 		String id = crear(solicitud.claveIdempotencia(), solicitud.monto(), limite);
 		Respuesta confirmacion = enviar("POST", "/v1/payment_intents/" + id + "/confirm", Map.of(),
 				solicitud.claveIdempotencia() + ":confirmar", limite);
-		if (confirmacion.estado() == 402 || confirmacion.estado() == 400) {
-			// Stripe rechazó la tarjeta: responde un error con el motivo
-			return ResultadoPago.rechazado(id, confirmacion.cuerpo().path("error").path("message").asString(""));
+		JsonNode error = confirmacion.cuerpo().path("error");
+		if (confirmacion.estado() == 402 || "card_error".equals(error.path("type").asString(""))) {
+			// Stripe rechazó la tarjeta. Otros errores (parámetros, clave...) dejan el cobro en duda
+			return ResultadoPago.rechazado(id, error.path("message").asString(""));
 		}
 		verificar(confirmacion);
 		String estado = confirmacion.cuerpo().path("status").asString("");
@@ -147,11 +162,17 @@ public class StripeAdapter implements PasarelaPagos {
 		} else {
 			peticion.GET();
 		}
+		// El límite cubre la respuesta completa, incluido el cuerpo, no solo las cabeceras
+		CompletableFuture<HttpResponse<String>> envio = http.sendAsync(peticion.build(),
+				HttpResponse.BodyHandlers.ofString());
 		try {
-			HttpResponse<String> respuesta = http.send(peticion.build(), HttpResponse.BodyHandlers.ofString());
+			HttpResponse<String> respuesta = envio.get(Math.max(1, restante.toMillis()), TimeUnit.MILLISECONDS);
 			return new Respuesta(respuesta.statusCode(), json.readTree(respuesta.body()));
-		} catch (IOException e) {
+		} catch (TimeoutException e) {
+			envio.cancel(true);
 			throw new PasarelaNoDisponibleException("Stripe no respondió a tiempo.", e);
+		} catch (ExecutionException e) {
+			throw new PasarelaNoDisponibleException("Falló la llamada a Stripe.", e.getCause());
 		} catch (JacksonException e) {
 			throw new PasarelaNoDisponibleException("Stripe respondió algo que no es JSON.", e);
 		} catch (InterruptedException e) {

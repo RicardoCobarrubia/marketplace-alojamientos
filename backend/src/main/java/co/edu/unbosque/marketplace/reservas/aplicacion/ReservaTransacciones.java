@@ -168,7 +168,8 @@ public class ReservaTransacciones {
 			return new Desenlace(respuestaGuardada(reserva), true);
 		}
 		PeriodoReservado fechas = fechasDe(reservaId);
-		if (fechas.getLiberadoEn() != null) {
+		if (!fechas.estaVigente(reloj.instant())) {
+			// Se liberaron o la retención de 10 minutos ya venció: no se puede confirmar
 			RespuestaReserva respuesta = fallar(reserva, fechas, HttpStatus.CONFLICT, "FECHAS_NO_DISPONIBLES",
 					"Las fechas dejaron de estar disponibles mientras se procesaba el pago. El cobro se devolverá.",
 					referenciaPago, true);
@@ -282,7 +283,7 @@ public class ReservaTransacciones {
 	}
 
 	private PeriodoReservado fechasDe(Long reservaId) {
-		return periodoReservadoRepository.findByReservaId(reservaId)
+		return periodoReservadoRepository.bloquearPorReserva(reservaId)
 				.orElseThrow(() -> new IllegalStateException("La reserva " + reservaId + " no tiene fechas retenidas."));
 	}
 

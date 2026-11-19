@@ -6,11 +6,13 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import co.edu.unbosque.marketplace.disponibilidad.dominio.PeriodoReservado;
+import jakarta.persistence.LockModeType;
 
 public interface PeriodoReservadoRepository extends JpaRepository<PeriodoReservado, Long> {
 
@@ -44,4 +46,12 @@ public interface PeriodoReservadoRepository extends JpaRepository<PeriodoReserva
 			  and p.fechaLlegada < :hasta and p.fechaSalida > :desde""")
 	int liberarRetencionesVencidas(@Param("alojamientoId") Long alojamientoId, @Param("desde") LocalDate desde,
 			@Param("hasta") LocalDate hasta, @Param("ahora") Instant ahora);
+
+	/**
+	 * Las fechas de una reserva, bloqueadas hasta el fin de la transacción 2: así la liberación
+	 * de retenciones vencidas de otra reserva no se cruza con la confirmación de esta (MA-60).
+	 */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select p from PeriodoReservado p where p.reservaId = :reservaId")
+	Optional<PeriodoReservado> bloquearPorReserva(@Param("reservaId") Long reservaId);
 }

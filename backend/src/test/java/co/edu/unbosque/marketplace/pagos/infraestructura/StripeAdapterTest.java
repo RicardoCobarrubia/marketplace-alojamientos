@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,9 +33,11 @@ class StripeAdapterTest {
 
 	private HttpServer servidor;
 	private final List<String> peticiones = new CopyOnWriteArrayList<>();
+	private final AtomicInteger confirmaciones = new AtomicInteger();
 	private volatile int codigoConfirmacion = 200;
 	private volatile String estadoConsultado = "succeeded";
 	private volatile long demoraMs;
+	private volatile String errorConfirmacion = "{\"error\":{\"type\":\"card_error\",\"message\":\"Your card was declined.\"}}";
 	private StripeAdapter adaptador;
 
 	@BeforeEach
@@ -65,22 +68,47 @@ class StripeAdapterTest {
 				+ intercambio.getRequestHeaders().getFirst("Idempotency-Key") + " "
 				+ intercambio.getRequestHeaders().getFirst("Authorization") + " " + cuerpo);
 		if (ruta.endsWith("/confirm")) {
+			confirmaciones.incrementAndGet();
 			esperar();
-			if (codigoConfirmacion == 402) {
-				responder(intercambio, 402, "{\"error\":{\"message\":\"Your card was declined.\"}}");
+			if (codigoConfirmacion == 402 || codigoConfirmacion == 400) {
+				responder(intercambio, codigoConfirmacion, errorConfirmacion);
 			} else {
 				responder(intercambio, codigoConfirmacion, "{\"id\":\"pi_1\",\"status\":\"succeeded\"}");
 			}
 		} else if ("GET".equals(intercambio.getRequestMethod())) {
-			responder(intercambio, 200, "{\"id\":\"pi_1\",\"status\":\"" + estadoConsultado + "\"}");
+			if (ruta.equals("/v1/payment_intents/pi_1")) {
+				responder(intercambio, 200, "{\"id\":\"pi_1\",\"status\":\"" + estadoConsultado + "\"}");
+			} else {
+				responder(intercambio, 404, "{\"error\":{\"message\":\"No such payment_intent\"}}");
+			}
 		} else {
 			responder(intercambio, 200, "{\"id\":\"pi_1\",\"status\":\"requires_confirmation\"}");
 		}
 	}
 
+	/** Crear y confirmar tardan lo mismo; cuenta las confirmaciones que llegan al servidor. */
+	private void demorarAmbosPasos(long milisegundos) {
+		demoraMs = milisegundos;
+		servidor.removeContext("/v1/payment_intents");
+		servidor.createContext("/v1/payment_intents", intercambio -> {
+			intercambio.getRequestBody().readAllBytes();
+			boolean confirmar = intercambio.getRequestURI().getPath().endsWith("/confirm");
+			if (confirmar) {
+				confirmaciones.incrementAndGet();
+			}
+			esperar();
+			responder(intercambio, 200,
+					"{\"id\":\"pi_1\",\"status\":\"" + (confirmar ? "succeeded" : "requires_confirmation") + "\"}");
+		});
+	}
+
 	private void esperar() {
+		esperarMs(demoraMs);
+	}
+
+	private static void esperarMs(long milisegundos) {
 		try {
-			Thread.sleep(demoraMs);
+			Thread.sleep(milisegundos);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}
@@ -140,6 +168,9 @@ class StripeAdapterTest {
 		assertThat(adaptador.consultar("reserva-7", MONTO).estado()).isEqualTo(EstadoPago.NO_COBRADO);
 		assertThat(peticiones).filteredOn(peticion -> peticion.startsWith("POST /v1/payment_intents "))
 				.allMatch(peticion -> peticion.contains("reserva-7:crear"));
+		// El GET va al mismo PaymentIntent que devolvió la creación
+		assertThat(peticiones).filteredOn(peticion -> peticion.startsWith("GET "))
+				.hasSize(2).allMatch(peticion -> peticion.startsWith("GET /v1/payment_intents/pi_1 "));
 	}
 
 	@Test
@@ -163,17 +194,62 @@ class StripeAdapterTest {
 	@Test
 	void losDosPasosDelCobroCompartenElMismoLimiteDeTiempo() {
 		// Cada paso solo tarda 300 ms, pero juntos superan el límite de 500 ms
-		demoraMs = 300;
-		servidor.removeContext("/v1/payment_intents");
-		servidor.createContext("/v1/payment_intents", intercambio -> {
-			intercambio.getRequestBody().readAllBytes();
-			esperar();
-			String estado = intercambio.getRequestURI().getPath().endsWith("/confirm") ? "succeeded" : "requires_confirmation";
-			responder(intercambio, 200, "{\"id\":\"pi_1\",\"status\":\"" + estado + "\"}");
-		});
+		demorarAmbosPasos(300);
 		SolicitudCobro solicitud = new SolicitudCobro("reserva-7", MONTO, "Reserva 7");
 
 		assertThatThrownBy(() -> adaptador.cobrar(solicitud)).isInstanceOf(PasarelaNoDisponibleException.class);
+		// La creación terminó bien: lo que se agotó fue el tiempo de la confirmación
+		assertThat(confirmaciones).hasValue(1);
+	}
+
+	@Test
+	void conTodoElPlazoLaMismaDemoraSiAlcanza() {
+		demorarAmbosPasos(300);
+		StripeAdapter conMasTiempo = new StripeAdapter(JsonMapper.builder().build(),
+				"http://127.0.0.1:" + servidor.getAddress().getPort(), "sk_test_prueba", "cop", "pm_card_visa",
+				Duration.ofSeconds(3));
+
+		assertThat(conMasTiempo.cobrar(new SolicitudCobro("reserva-7", MONTO, "Reserva 7")).aprobado()).isTrue();
+	}
+
+	@Test
+	void unErrorDeLaPeticionNoEsUnRechazoDeLaTarjeta() {
+		codigoConfirmacion = 400;
+		errorConfirmacion = "{\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Parámetro inválido\"}}";
+		SolicitudCobro solicitud = new SolicitudCobro("reserva-7", MONTO, "Reserva 7");
+
+		assertThatThrownBy(() -> adaptador.cobrar(solicitud)).isInstanceOf(PasarelaNoDisponibleException.class);
+	}
+
+	@Test
+	void unCuerpoQueNoTerminaDeLlegarTambienAgotaElPlazo() throws IOException {
+		servidor.createContext("/v1/lento", intercambio -> {
+			intercambio.getRequestBody().readAllBytes();
+			intercambio.sendResponseHeaders(200, 0);
+			OutputStream salida = intercambio.getResponseBody();
+			salida.write("{\"id\":".getBytes(StandardCharsets.UTF_8));
+			salida.flush();
+			esperarMs(1500);
+			salida.write("\"pi_1\"}".getBytes(StandardCharsets.UTF_8));
+			salida.close();
+		});
+		StripeAdapter lento = new StripeAdapter(JsonMapper.builder().build(),
+				"http://127.0.0.1:" + servidor.getAddress().getPort() + "/v1/lento", "sk_test_prueba", "cop",
+				"pm_card_visa", Duration.ofMillis(500));
+		SolicitudCobro solicitud = new SolicitudCobro("reserva-7", MONTO, "Reserva 7");
+
+		assertThatThrownBy(() -> lento.cobrar(solicitud)).isInstanceOf(PasarelaNoDisponibleException.class);
+	}
+
+	@Test
+	void soloAdmiteClavesDePruebaYMonedasConCentavos() {
+		JsonMapper json = JsonMapper.builder().build();
+		Duration timeout = Duration.ofSeconds(1);
+
+		assertThatThrownBy(() -> new StripeAdapter(json, "https://api.stripe.com", "sk_live_123", "cop",
+				"pm_card_visa", timeout)).isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> new StripeAdapter(json, "https://api.stripe.com", "sk_test_123", "jpy",
+				"pm_card_visa", timeout)).isInstanceOf(IllegalStateException.class);
 	}
 
 	@Test

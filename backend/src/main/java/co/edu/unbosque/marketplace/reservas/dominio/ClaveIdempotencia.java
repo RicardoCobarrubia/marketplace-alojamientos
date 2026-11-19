@@ -92,6 +92,10 @@ public class ClaveIdempotencia {
 		return id;
 	}
 
+	public Long getUsuarioId() {
+		return usuarioId;
+	}
+
 	public String getClave() {
 		return clave;
 	}

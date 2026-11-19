@@ -171,6 +171,15 @@ public class ReservaService {
 			// ADR-002: el proceso cayó entre el cobro y la transacción 2; se consulta y se completa
 			return recuperar(reserva.get());
 		}
+		if (reserva.isPresent() && reserva.get().getEstado() != EstadoReserva.PENDIENTE_PAGO) {
+			// Se resolvió entre las dos lecturas: la respuesta ya quedó guardada en la clave
+			Optional<RespuestaReserva> guardada = transacciones.buscarClave(previa.getUsuarioId(), previa.getClave())
+					.filter(clave -> clave.getEstado() == EstadoClave.TERMINADA)
+					.map(clave -> new RespuestaReserva(clave.getCodigoHttp(), clave.getRespuesta()));
+			if (guardada.isPresent()) {
+				return guardada.get();
+			}
+		}
 		return new RespuestaReserva(HttpStatus.ACCEPTED.value(), enProceso(previa.getReservaId()));
 	}
 
@@ -196,8 +205,10 @@ public class ReservaService {
 		if (real.aprobado()) {
 			return aplicar(reservaId, total, real);
 		}
+		// Queda por verificar: si el intento original todavía estaba por cobrar, el conciliador
+		// encontrará ese cobro tardío y lo devolverá
 		return transacciones.compensar(reservaId, HttpStatus.PAYMENT_REQUIRED, "PAGO_NO_REALIZADO",
-				"El pago no se completó.", null, false, false).respuesta();
+				"El pago no se completó.", null, true, false).respuesta();
 	}
 
 	/**
@@ -217,7 +228,7 @@ public class ReservaService {
 		}
 		// Si mientras tanto otro flujo la confirmó, compensar no cambia nada y no se devuelve
 		Desenlace desenlace = transacciones.compensar(reservaId, HttpStatus.CONFLICT, RETENCION_VENCIDA,
-				DETALLE_RETENCION_VENCIDA, real.referencia(), false, real.aprobado());
+				DETALLE_RETENCION_VENCIDA, real.referencia(), !real.aprobado(), real.aprobado());
 		if (desenlace.requiereDevolucion()) {
 			devolver(reservaId, real.referencia(), total);
 		}
