@@ -7,8 +7,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,9 +32,10 @@ import co.edu.unbosque.marketplace.ApiDePrueba;
 import co.edu.unbosque.marketplace.TestcontainersConfiguration;
 import co.edu.unbosque.marketplace.reservas.aplicacion.ConciliadorReservas;
 import co.edu.unbosque.marketplace.reservas.aplicacion.ReservaTransacciones;
+import co.edu.unbosque.marketplace.reservas.presentacion.PasarelaDePrueba.Modo;
 
 /**
- * Consultar, cancelar y completar reservas contra PostgreSQL real (MA-70, MA-71, MA-72).
+ * Consultar, cancelar con devolución y completar reservas contra PostgreSQL real (MA-70 a MA-74).
  * Requiere Docker en ejecución.
  */
 @Import({ TestcontainersConfiguration.class, ReservaIntegrationTest.Pasarela.class })
@@ -96,6 +103,14 @@ class GestionReservasIntegrationTest {
 		return jdbc.queryForObject("SELECT estado FROM reserva WHERE id = ?", String.class, id);
 	}
 
+	private BigDecimal columna(String nombre, long reservaId) {
+		return jdbc.queryForObject("SELECT " + nombre + " FROM reserva WHERE id = ?", BigDecimal.class, reservaId);
+	}
+
+	private String referencia(long reservaId) {
+		return jdbc.queryForObject("SELECT referencia_pago FROM reserva WHERE id = ?", String.class, reservaId);
+	}
+
 	private String ultimoEvento(long reservaId) {
 		return jdbc.queryForObject("SELECT tipo FROM evento_outbox WHERE agregado_id = ? ORDER BY id DESC LIMIT 1",
 				String.class, reservaId);
@@ -159,12 +174,17 @@ class GestionReservasIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.estado").value("CANCELADA"))
 				.andExpect(jsonPath("$.motivoCancelacion").value("Cambio de planes"))
-				.andExpect(jsonPath("$.canceladaEn").isNotEmpty());
+				.andExpect(jsonPath("$.canceladaEn").isNotEmpty())
+				// MA-73: con 48 horas o más de anticipación se devuelve el total
+				.andExpect(jsonPath("$.valorDevolucion").value(693000.0))
+				.andExpect(jsonPath("$.devolucionPendiente").value(false));
 
 		disponibilidad().andExpect(jsonPath("$.disponible").value(true));
 		assertThat(jdbc.queryForObject("SELECT cancelada_por = huesped_id FROM reserva WHERE id = ?", Boolean.class,
 				id)).isTrue();
-		assertThat(ultimoEvento(id)).isEqualTo("RESERVA_CANCELADA");
+		assertThat(pasarela.montoDevuelto(referencia(id))).isEqualByComparingTo("693000");
+		assertThat(jdbc.queryForList("SELECT tipo FROM evento_outbox WHERE agregado_id = ? ORDER BY id", String.class,
+				id)).containsExactly("RESERVA_CONFIRMADA", "RESERVA_CANCELADA", "DEVOLUCION_SOLICITADA");
 		// Otro huésped puede reservar las mismas fechas
 		String otro = api.registrarEIniciarSesion("otro@correo.com", "HUESPED");
 		reservar(otro, "r-2", LLEGADA, SALIDA);
@@ -201,6 +221,96 @@ class GestionReservasIntegrationTest {
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.codigo").value("CANCELACION_NO_PERMITIDA"));
 		assertThat(estadoReserva(id)).isEqualTo("CONFIRMADA");
+	}
+
+	// ─────────────────────────────────────────
+	// MA-73, MA-74: devolución
+	// ─────────────────────────────────────────
+
+	@Test
+	void conMenosDeCuarentaYOchoHorasSeDevuelveLaMitad() throws Exception {
+		long id = reservar(huesped, "r-1", HOY.plusDays(1), HOY.plusDays(3));
+
+		cancelar(huesped, id, "{\"motivo\":\"Último momento\"}").andExpect(status().isOk());
+
+		BigDecimal total = columna("total", id);
+		assertThat(columna("valor_devolucion", id)).isEqualByComparingTo(total.divide(BigDecimal.TWO));
+		assertThat(pasarela.montoDevuelto(referencia(id))).isEqualByComparingTo(total.divide(BigDecimal.TWO));
+	}
+
+	@Test
+	void mientrasUnaEjecucionPideLaDevolucionOtraNoEntraALaPasarela() throws Exception {
+		long id = reservar(huesped, "r-1", LLEGADA, SALIDA);
+		pasarela.modo(Modo.CAIDA);
+		cancelar(huesped, id, "{\"motivo\":\"Cambio de planes\"}").andExpect(status().isOk());
+		jdbc.update("UPDATE reserva SET devolucion_reclamada_hasta = NULL WHERE id = ?", id);
+		pasarela.modo(Modo.APROBAR);
+		CountDownLatch dentro = new CountDownLatch(1);
+		CountDownLatch soltar = new CountDownLatch(1);
+		pasarela.detenerSiguienteDevolucion(dentro, soltar);
+
+		ExecutorService hilo = Executors.newSingleThreadExecutor();
+		try {
+			Future<Integer> primera = hilo.submit(() -> conciliador.reintentarDevoluciones());
+			assertThat(dentro.await(30, TimeUnit.SECONDS)).isTrue();
+
+			// La primera sigue dentro de la pasarela: la segunda no entra
+			assertThat(conciliador.reintentarDevoluciones()).isZero();
+
+			soltar.countDown();
+			assertThat(primera.get(30, TimeUnit.SECONDS)).isEqualTo(1);
+		} finally {
+			hilo.shutdownNow();
+		}
+		String referencia = referencia(id);
+		// El intento fallido (sin respuesta) y el reintento usan la misma clave
+		assertThat(pasarela.llamadasDevolucion()).containsExactly(
+				referencia + " 693000 reserva-" + id + "-cancelacion 1",
+				referencia + " 693000 reserva-" + id + "-cancelacion 1");
+		assertThat(conciliador.reintentarDevoluciones()).isZero();
+	}
+
+	@Test
+	void siCancelaElAdministradorSeDevuelveElTotal() throws Exception {
+		long id = reservar(huesped, "r-1", HOY.plusDays(1), HOY.plusDays(3));
+
+		cancelar(administrador, id, "{\"motivo\":\"Alojamiento no disponible\"}")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estado").value("CANCELADA"));
+
+		assertThat(columna("valor_devolucion", id)).isEqualByComparingTo(columna("total", id));
+		assertThat(jdbc.queryForObject("SELECT u.rol FROM reserva r JOIN usuario u ON u.id = r.cancelada_por "
+				+ "WHERE r.id = ?", String.class, id)).isEqualTo("ADMINISTRADOR");
+	}
+
+	@Test
+	void siLaPasarelaFallaLaCancelacionQuedaCompletaYElConciliadorDevuelveDespues() throws Exception {
+		long id = reservar(huesped, "r-1", LLEGADA, SALIDA);
+		pasarela.modo(Modo.CAIDA);
+
+		cancelar(huesped, id, "{\"motivo\":\"Cambio de planes\"}")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estado").value("CANCELADA"))
+				.andExpect(jsonPath("$.devolucionPendiente").value(true));
+
+		// MA-74, escenario 3: nada a medias; la reserva quedó cancelada y las fechas libres
+		assertThat(estadoReserva(id)).isEqualTo("CANCELADA");
+		disponibilidad().andExpect(jsonPath("$.disponible").value(true));
+		assertThat(pasarela.devoluciones()).isZero();
+		assertThat(conciliador.reintentarDevoluciones()).isZero();
+
+		pasarela.modo(Modo.APROBAR);
+		// El intento fallido sigue reclamado unos minutos por si la petición seguía en la pasarela
+		assertThat(conciliador.reintentarDevoluciones()).isZero();
+		jdbc.update("UPDATE reserva SET devolucion_reclamada_hasta = now() - interval '1 second' WHERE id = ?", id);
+		assertThat(conciliador.reintentarDevoluciones()).isEqualTo(1);
+
+		assertThat(pasarela.montoDevuelto(referencia(id))).isEqualByComparingTo("693000");
+		assertThat(jdbc.queryForObject("SELECT devolucion_pendiente FROM reserva WHERE id = ?", Boolean.class, id))
+				.isFalse();
+		assertThat(conciliador.reintentarDevoluciones()).isZero();
+		assertThat(pasarela.devoluciones()).isEqualTo(1);
+		assertThat(pasarela.llamadasDevolucion()).hasSize(2);
 	}
 
 	// ─────────────────────────────────────────

@@ -282,7 +282,18 @@ class StripeAdapterTest {
 		codigoDevolucion = 500;
 
 		assertThatThrownBy(() -> adaptador.devolver("pi_1", MONTO, "reserva-7", 1))
-				.isInstanceOf(PasarelaNoDisponibleException.class);
+				.isInstanceOf(PasarelaNoDisponibleException.class)
+				// Stripe respondió: un reintento debe usar otra clave
+				.hasFieldOrPropertyWithValue("puedeSeguirEnCurso", false);
+	}
+
+	@Test
+	void siStripeNoRespondeALaDevolucionPuedeSeguirEnCurso() {
+		demoraMs = 1500;
+
+		assertThatThrownBy(() -> adaptador.devolver("pi_1", MONTO, "reserva-7", 1))
+				.isInstanceOf(PasarelaNoDisponibleException.class)
+				.hasFieldOrPropertyWithValue("puedeSeguirEnCurso", true);
 	}
 
 	// ─────────────────────────────────────────

@@ -14,6 +14,8 @@ import co.edu.unbosque.marketplace.pagos.dominio.PasarelaNoDisponibleException;
  * alcanzó a cobrar, se devuelve el pago (MA-60, escenario 2).</li>
  * <li>Pagos en duda (la pasarela no respondió ni a la consulta): se consultan otra vez y, si hubo
  * cobro, se devuelve (MA-68, escenario 3).</li>
+ * <li>Cancelaciones cuya devolución la pasarela no aceptó: se piden otra vez (MA-74, escenario
+ * 3).</li>
  * <li>Reservas confirmadas cuya fecha de salida ya llegó: pasan a COMPLETADA (MA-71, escenario
  * 3).</li>
  * </ul>
@@ -28,12 +30,14 @@ public class ConciliadorReservas {
 	private final ReservaTransacciones transacciones;
 	private final ReservaService reservaService;
 	private final GestionReservasService gestion;
+	private final CancelacionService cancelaciones;
 
 	public ConciliadorReservas(ReservaTransacciones transacciones, ReservaService reservaService,
-			GestionReservasService gestion) {
+			GestionReservasService gestion, CancelacionService cancelaciones) {
 		this.transacciones = transacciones;
 		this.reservaService = reservaService;
 		this.gestion = gestion;
+		this.cancelaciones = cancelaciones;
 	}
 
 	@Scheduled(fixedDelayString = "${marketplace.reservas.conciliacion:PT30S}",
@@ -41,6 +45,7 @@ public class ConciliadorReservas {
 	public void conciliar() {
 		vencerRetenciones();
 		verificarPagosEnDuda();
+		reintentarDevoluciones();
 	}
 
 	public int vencerRetenciones() {
@@ -70,6 +75,22 @@ public class ConciliadorReservas {
 			}
 		}
 		return verificadas;
+	}
+
+	public int reintentarDevoluciones() {
+		int solicitadas = 0;
+		for (Long reservaId : cancelaciones.devolucionesPendientes()) {
+			try {
+				if (cancelaciones.devolver(reservaId)) {
+					solicitadas++;
+				}
+			} catch (PasarelaNoDisponibleException e) {
+				log.warn("La pasarela sigue sin aceptar la devolución de la reserva {}", reservaId);
+			} catch (RuntimeException e) {
+				log.error("No se pudo pedir la devolución de la reserva {}", reservaId, e);
+			}
+		}
+		return solicitadas;
 	}
 
 	@Scheduled(fixedDelayString = "${marketplace.reservas.completar:PT1H}", initialDelayString = "PT1M")

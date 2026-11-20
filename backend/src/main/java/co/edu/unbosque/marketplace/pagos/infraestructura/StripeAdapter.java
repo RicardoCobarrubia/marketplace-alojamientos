@@ -122,7 +122,7 @@ public class StripeAdapter implements PasarelaPagos {
 			return ResultadoPago.rechazado(referencia, estado);
 		}
 		// processing, requires_action o un estado desconocido: no se sabe si cobró, se consulta después
-		throw new PasarelaNoDisponibleException("Stripe dejó el cobro en estado '" + estado + "'.");
+		throw PasarelaNoDisponibleException.conRespuesta("Stripe dejó el cobro en estado '" + estado + "'.");
 	}
 
 	@Override
@@ -141,7 +141,7 @@ public class StripeAdapter implements PasarelaPagos {
 		verificar(existentes);
 		if (existentes.cuerpo().path("has_more").asBoolean(false)) {
 			// No se ven todas las devoluciones: sin el saldo exacto no se pide nada y queda por verificar
-			throw new PasarelaNoDisponibleException("El cobro " + referencia + " tiene demasiadas devoluciones.");
+			throw PasarelaNoDisponibleException.conRespuesta("El cobro " + referencia + " tiene demasiadas devoluciones.");
 		}
 		long yaDevuelto = 0;
 		for (JsonNode devolucion : existentes.cuerpo().path("data")) {
@@ -169,7 +169,7 @@ public class StripeAdapter implements PasarelaPagos {
 			Instant limite) {
 		Duration restante = Duration.between(Instant.now(), limite);
 		if (restante.isNegative() || restante.isZero()) {
-			throw new PasarelaNoDisponibleException("Se agotó el tiempo para hablar con Stripe.");
+			throw PasarelaNoDisponibleException.conRespuesta("Se agotó el tiempo para hablar con Stripe.");
 		}
 		HttpRequest.Builder peticion = HttpRequest.newBuilder(URI.create(urlBase + ruta))
 				.timeout(restante)
@@ -195,7 +195,8 @@ public class StripeAdapter implements PasarelaPagos {
 		} catch (ExecutionException e) {
 			throw new PasarelaNoDisponibleException("Falló la llamada a Stripe.", e.getCause());
 		} catch (JacksonException e) {
-			throw new PasarelaNoDisponibleException("Stripe respondió algo que no es JSON.", e);
+			// La petición terminó, aunque la respuesta no se pueda leer
+			throw PasarelaNoDisponibleException.conRespuesta("Stripe respondió algo que no es JSON: " + e.getMessage());
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new PasarelaNoDisponibleException("Se interrumpió la llamada a Stripe.", e);
@@ -214,7 +215,7 @@ public class StripeAdapter implements PasarelaPagos {
 	/** Un error que no es de la tarjeta (5xx, clave inválida...) deja el cobro en duda. */
 	private static void verificar(Respuesta respuesta) {
 		if (respuesta.estado() >= 300) {
-			throw new PasarelaNoDisponibleException("Stripe respondió " + respuesta.estado() + ": "
+			throw PasarelaNoDisponibleException.conRespuesta("Stripe respondió " + respuesta.estado() + ": "
 					+ respuesta.cuerpo().path("error").path("message").asString(""));
 		}
 	}

@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +55,7 @@ public class ReservaTransacciones {
 
 	private static final Logger log = LoggerFactory.getLogger(ReservaTransacciones.class);
 	private static final String NO_EXISTE = "La reserva no existe.";
+	private static final Duration PLAZO_DEVOLUCION = Duration.ofMinutes(2);
 
 	private final ReservaRepository reservaRepository;
 	private final ClaveIdempotenciaRepository claveRepository;
@@ -236,6 +238,38 @@ public class ReservaTransacciones {
 	@Transactional
 	public int siguienteIntentoDevolucion(Long reservaId) {
 		return bloquear(reservaId).siguienteIntentoDevolucion(reloj.instant());
+	}
+
+	/**
+	 * Reserva la solicitud de la devolución de una cancelación para quien llama, con la fila
+	 * bloqueada: dos ejecuciones a la vez no la piden las dos. El plazo cubre de sobra las dos
+	 * llamadas a la pasarela (cada una con su timeout).
+	 *
+	 * @return el número del intento, o vacío si no está pendiente o ya otra ejecución la reclamó
+	 */
+	@Transactional
+	public OptionalInt reclamarDevolucion(Long reservaId) {
+		return bloquear(reservaId).reclamarDevolucion(reloj.instant(), PLAZO_DEVOLUCION);
+	}
+
+	@Transactional
+	public void registrarFalloDevolucion(Long reservaId, boolean puedeSeguirEnCurso) {
+		bloquear(reservaId).devolucionFallida(puedeSeguirEnCurso, reloj.instant());
+	}
+
+	/** La pasarela aceptó la devolución de una cancelación (MA-73, escenario 2). */
+	@Transactional
+	public void marcarDevolucionSolicitada(Long reservaId) {
+		Reserva reserva = bloquear(reservaId);
+		if (reserva.isDevolucionPendiente()) {
+			reserva.devolucionSolicitada(reloj.instant());
+			eventos.publicar("DEVOLUCION_SOLICITADA", reserva, Map.of("valorDevolucion", reserva.getValorDevolucion()));
+		}
+	}
+
+	@Transactional(readOnly = true)
+	public List<Long> devolucionesPendientes() {
+		return reservaRepository.buscarDevolucionesPendientes();
 	}
 
 	@Transactional

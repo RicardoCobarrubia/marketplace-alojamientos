@@ -1,10 +1,12 @@
 package co.edu.unbosque.marketplace.reservas.dominio;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -111,6 +113,9 @@ public class Reserva {
 	@Column(name = "politica_cancelacion_id", nullable = false, updatable = false)
 	private Short politicaCancelacionId;
 
+	@Column(name = "politica_cancelacion_codigo", nullable = false, updatable = false, length = 40)
+	private String politicaCancelacionCodigo;
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name = "politica_cancelacion", nullable = false, updatable = false, columnDefinition = "jsonb")
 	private String politicaCancelacion;
@@ -144,6 +149,18 @@ public class Reserva {
 
 	@Column(name = "cancelada_en")
 	private Instant canceladaEn;
+
+	/** Lo que se devuelve al cancelar según la política (MA-73, MA-74). */
+	@Column(name = "valor_devolucion", precision = 12, scale = 2)
+	private BigDecimal valorDevolucion;
+
+	/** La devolución se calculó pero la pasarela todavía no la aceptó: el conciliador la reintenta. */
+	@Column(name = "devolucion_pendiente", nullable = false)
+	private boolean devolucionPendiente;
+
+	/** Hasta cuándo una ejecución tiene reservada la solicitud de la devolución a la pasarela. */
+	@Column(name = "devolucion_reclamada_hasta")
+	private Instant devolucionReclamadaHasta;
 
 	@Column(name = "correlation_id", length = 100, updatable = false)
 	private String correlationId;
@@ -183,6 +200,7 @@ public class Reserva {
 				linea.nombre(), linea.modalidad(), linea.costoUnitario(), Math.toIntExact(linea.cantidad()),
 				linea.valor())));
 		this.politicaCancelacionId = alojamiento.getPoliticaCancelacion().getId();
+		this.politicaCancelacionCodigo = alojamiento.getPoliticaCancelacion().getCodigo();
 		this.politicaCancelacion = alojamiento.getPoliticaCancelacion().getParametros();
 		this.correlationId = correlationId;
 		this.creadoEn = ahora;
@@ -251,12 +269,14 @@ public class Reserva {
 	// ─────────────────────────────────────────
 
 	/**
-	 * El huésped cancela su reserva: CONFIRMADA o EN_REVISION → CANCELADA, siempre antes del día
-	 * de llegada (MA-72). Una reserva en curso, completada o ya cancelada no se puede cancelar.
+	 * El huésped o el administrador cancela la reserva: CONFIRMADA o EN_REVISION → CANCELADA,
+	 * siempre antes del día de llegada (MA-72). Una reserva en curso, completada o ya cancelada no
+	 * se puede cancelar. Queda registrado quién, cuándo, por qué y cuánto se devuelve (MA-74).
 	 *
+	 * @param devolucion valor a devolver según la política, entre cero y el total
 	 * @param hoy la fecha de hoy en la zona horaria del marketplace
 	 */
-	public void cancelar(Long usuarioId, String motivo, LocalDate hoy, Instant ahora) {
+	public void cancelar(Long usuarioId, String motivo, BigDecimal devolucion, LocalDate hoy, Instant ahora) {
 		if (motivo == null || motivo.isBlank()) {
 			throw new SolicitudInvalidaException("MOTIVO_REQUERIDO", "Debes indicar el motivo de la cancelación.");
 		}
@@ -268,10 +288,60 @@ public class Reserva {
 			throw new ReglaNegocioException("CANCELACION_NO_PERMITIDA",
 					"La estadía ya empezó o terminó: la reserva no se puede cancelar.");
 		}
+		if (devolucion == null || devolucion.signum() < 0 || devolucion.compareTo(total) > 0) {
+			throw new IllegalArgumentException("La devolución debe estar entre cero y el total de la reserva.");
+		}
 		cambiarEstado(EstadoReserva.CANCELADA, ahora);
 		this.motivoCancelacion = motivo.strip();
 		this.canceladaPor = usuarioId;
 		this.canceladaEn = ahora;
+		this.valorDevolucion = devolucion;
+		this.devolucionPendiente = devolucion.signum() > 0 && referenciaPago != null;
+	}
+
+	/**
+	 * Reserva para una sola ejecución la solicitud de la devolución pendiente durante
+	 * {@code plazo}: mientras tanto, otra ejecución (por ejemplo el conciliador) no la pide a la
+	 * vez. Si la ejecución se cae, el reclamo vence solo y la devolución se puede reintentar.
+	 * <p>
+	 * El intento (que forma la clave de idempotencia) solo cambia cuando la pasarela respondió con
+	 * un error ({@link #devolucionFallida}). Así, si un reclamo vence mientras su petición sigue en
+	 * curso, el reintento usa la misma clave y la pasarela no devuelve dos veces.
+	 *
+	 * @return el número del intento, o vacío si no hay devolución pendiente o ya otra la reclamó
+	 */
+	public OptionalInt reclamarDevolucion(Instant ahora, Duration plazo) {
+		if (!devolucionPendiente || (devolucionReclamadaHasta != null && devolucionReclamadaHasta.isAfter(ahora))) {
+			return OptionalInt.empty();
+		}
+		this.devolucionReclamadaHasta = ahora.plus(plazo);
+		this.actualizadoEn = ahora;
+		if (intentosDevolucion == 0) {
+			intentosDevolucion = 1;
+		}
+		return OptionalInt.of(intentosDevolucion);
+	}
+
+	/**
+	 * La pasarela no aceptó la devolución.
+	 *
+	 * @param puedeSeguirEnCurso no hubo respuesta: se conservan el reclamo hasta que venza y el
+	 *        intento, para reintentar con la misma clave. Si la pasarela respondió con un error,
+	 *        se suelta el reclamo y el siguiente intento usa una clave nueva.
+	 */
+	public void devolucionFallida(boolean puedeSeguirEnCurso, Instant ahora) {
+		if (!puedeSeguirEnCurso) {
+			intentosDevolucion++;
+			devolucionReclamadaHasta = null;
+		}
+		this.actualizadoEn = ahora;
+	}
+
+	/** La pasarela aceptó la devolución de la cancelación (MA-73, escenario 2). */
+	public void devolucionSolicitada(Instant ahora) {
+		this.devolucionPendiente = false;
+		this.devolucionReclamadaHasta = null;
+		this.actualizadoEn = ahora;
 	}
 
 	/**
@@ -414,6 +484,18 @@ public class Reserva {
 
 	public Instant getCanceladaEn() {
 		return canceladaEn;
+	}
+
+	public String getPoliticaCancelacionCodigo() {
+		return politicaCancelacionCodigo;
+	}
+
+	public BigDecimal getValorDevolucion() {
+		return valorDevolucion;
+	}
+
+	public boolean isDevolucionPendiente() {
+		return devolucionPendiente;
 	}
 
 	public String getCorrelationId() {

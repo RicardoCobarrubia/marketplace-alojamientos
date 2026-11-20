@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -142,12 +143,13 @@ class ReservaTest {
 	// ─────────────────────────────────────────
 
 	private static final LocalDate ANTES_DE_LLEGAR = RANGO.llegada().minusDays(1);
+	private static final BigDecimal DEVOLUCION = new BigDecimal("1000.00");
 
 	@Test
 	void elHuespedCancelaUnaReservaConfirmadaAntesDeLlegar() {
 		reserva.confirmar("pi_1", AHORA);
 
-		reserva.cancelar(2L, "  Cambio de planes ", ANTES_DE_LLEGAR, AHORA.plusSeconds(60));
+		reserva.cancelar(2L, "  Cambio de planes ", DEVOLUCION, ANTES_DE_LLEGAR, AHORA.plusSeconds(60));
 
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CANCELADA);
 		assertThat(reserva.getMotivoCancelacion()).isEqualTo("Cambio de planes");
@@ -160,7 +162,7 @@ class ReservaTest {
 		reserva.confirmar("pi_1", AHORA);
 		TestDatos.asignar(reserva, "estado", EstadoReserva.EN_REVISION);
 
-		reserva.cancelar(2L, "No puedo viajar", ANTES_DE_LLEGAR, AHORA);
+		reserva.cancelar(2L, "No puedo viajar", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
 
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CANCELADA);
 	}
@@ -169,9 +171,9 @@ class ReservaTest {
 	void cancelarSinMotivoSeRechaza() {
 		reserva.confirmar("pi_1", AHORA);
 
-		assertThatThrownBy(() -> reserva.cancelar(2L, "  ", ANTES_DE_LLEGAR, AHORA))
+		assertThatThrownBy(() -> reserva.cancelar(2L, "  ", DEVOLUCION, ANTES_DE_LLEGAR, AHORA))
 				.hasFieldOrPropertyWithValue("codigo", "MOTIVO_REQUERIDO");
-		assertThatThrownBy(() -> reserva.cancelar(2L, null, ANTES_DE_LLEGAR, AHORA))
+		assertThatThrownBy(() -> reserva.cancelar(2L, null, DEVOLUCION, ANTES_DE_LLEGAR, AHORA))
 				.hasFieldOrPropertyWithValue("codigo", "MOTIVO_REQUERIDO");
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
 	}
@@ -181,7 +183,7 @@ class ReservaTest {
 		reserva.confirmar("pi_1", AHORA);
 		LocalDate diaDeLlegada = RANGO.llegada();
 
-		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", diaDeLlegada, AHORA))
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", DEVOLUCION, diaDeLlegada, AHORA))
 				.isInstanceOf(ReglaNegocioException.class)
 				.hasFieldOrPropertyWithValue("codigo", "CANCELACION_NO_PERMITIDA");
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
@@ -192,7 +194,7 @@ class ReservaTest {
 	void soloSeCancelaUnaReservaConfirmadaOEnRevision(EstadoReserva estado) {
 		TestDatos.asignar(reserva, "estado", estado);
 
-		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", ANTES_DE_LLEGAR, AHORA))
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", DEVOLUCION, ANTES_DE_LLEGAR, AHORA))
 				.isInstanceOf(ReglaNegocioException.class)
 				.hasFieldOrPropertyWithValue("codigo", "CANCELACION_NO_PERMITIDA");
 	}
@@ -225,5 +227,97 @@ class ReservaTest {
 	void sabeQuienHizoLaReserva() {
 		assertThat(reserva.esDe(2L)).isTrue();
 		assertThat(reserva.esDe(1L)).isFalse();
+	}
+
+	// ─────────────────────────────────────────
+	// Devolución de la cancelación — MA-73, MA-74
+	// ─────────────────────────────────────────
+
+	@Test
+	void copiaElCodigoDeLaPoliticaAlReservar() {
+		assertThat(reserva.getPoliticaCancelacionCodigo()).isEqualTo("FLEXIBLE");
+	}
+
+	@Test
+	void alCancelarRegistraElValorYDejaLaDevolucionPendienteHastaQueLaPasarelaLaAcepte() {
+		reserva.confirmar("pi_1", AHORA);
+
+		reserva.cancelar(2L, "Cambio de planes", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
+		assertThat(reserva.getValorDevolucion()).isEqualByComparingTo("1000");
+		assertThat(reserva.isDevolucionPendiente()).isTrue();
+
+		reserva.devolucionSolicitada(AHORA.plusSeconds(5));
+		assertThat(reserva.isDevolucionPendiente()).isFalse();
+		assertThat(reserva.getActualizadoEn()).isEqualTo(AHORA.plusSeconds(5));
+	}
+
+	@Test
+	void soloUnaEjecucionALaVezReclamaLaDevolucionHastaQueVenceElPlazo() {
+		reserva.confirmar("pi_1", AHORA);
+		reserva.cancelar(2L, "Cambio de planes", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
+		Duration plazo = Duration.ofMinutes(2);
+
+		assertThat(reserva.reclamarDevolucion(AHORA, plazo)).hasValue(1);
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(60), plazo)).isEmpty();
+		// Si la primera se cayó, el reclamo vence y se reintenta con la misma clave
+		assertThat(reserva.reclamarDevolucion(AHORA.plus(plazo), plazo)).hasValue(1);
+
+		reserva.devolucionSolicitada(AHORA.plusSeconds(200));
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(500), plazo)).isEmpty();
+	}
+
+	@Test
+	void sinRespuestaDeLaPasarelaSeConservanElReclamoYLaClave() {
+		reserva.confirmar("pi_1", AHORA);
+		reserva.cancelar(2L, "Cambio de planes", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
+		Duration plazo = Duration.ofMinutes(2);
+		reserva.reclamarDevolucion(AHORA, plazo);
+
+		reserva.devolucionFallida(true, AHORA.plusSeconds(10));
+
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(20), plazo)).isEmpty();
+		assertThat(reserva.reclamarDevolucion(AHORA.plus(plazo), plazo)).hasValue(1);
+	}
+
+	@Test
+	void conUnErrorDeLaPasarelaSeSueltaElReclamoYCambiaLaClave() {
+		reserva.confirmar("pi_1", AHORA);
+		reserva.cancelar(2L, "Cambio de planes", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
+		Duration plazo = Duration.ofMinutes(2);
+		reserva.reclamarDevolucion(AHORA, plazo);
+
+		reserva.devolucionFallida(false, AHORA.plusSeconds(10));
+
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(20), plazo)).hasValue(2);
+	}
+
+	@Test
+	void sinDevolucionPendienteNoHayNadaQueReclamar() {
+		assertThat(reserva.reclamarDevolucion(AHORA, Duration.ofMinutes(2))).isEmpty();
+	}
+
+	@Test
+	void sinValorADevolverNoQuedaDevolucionPendiente() {
+		reserva.confirmar("pi_1", AHORA);
+
+		reserva.cancelar(2L, "Cambio de planes", BigDecimal.ZERO, ANTES_DE_LLEGAR, AHORA);
+
+		assertThat(reserva.getValorDevolucion()).isZero();
+		assertThat(reserva.isDevolucionPendiente()).isFalse();
+	}
+
+	@Test
+	void laDevolucionNoPuedeSerNegativaNiMayorQueElTotal() {
+		reserva.confirmar("pi_1", AHORA);
+		BigDecimal mayor = reserva.getTotal().add(BigDecimal.ONE);
+		BigDecimal negativa = BigDecimal.ONE.negate();
+
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", mayor, ANTES_DE_LLEGAR, AHORA))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", negativa, ANTES_DE_LLEGAR, AHORA))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> reserva.cancelar(2L, "Motivo", null, ANTES_DE_LLEGAR, AHORA))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.CONFIRMADA);
 	}
 }

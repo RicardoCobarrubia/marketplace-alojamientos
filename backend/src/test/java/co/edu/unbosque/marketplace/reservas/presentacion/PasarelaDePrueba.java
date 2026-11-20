@@ -1,10 +1,14 @@
 package co.edu.unbosque.marketplace.reservas.presentacion;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import co.edu.unbosque.marketplace.pagos.dominio.PasarelaNoDisponibleException;
@@ -32,6 +36,10 @@ public class PasarelaDePrueba implements PasarelaPagos {
 	private final Map<String, String> preparados = new ConcurrentHashMap<>();
 	private final Set<String> cobrados = ConcurrentHashMap.newKeySet();
 	private final Set<String> devoluciones = ConcurrentHashMap.newKeySet();
+	private final Map<String, BigDecimal> montosDevueltos = new ConcurrentHashMap<>();
+	private final List<String> llamadasDevolucion = new CopyOnWriteArrayList<>();
+	private volatile CountDownLatch dentroDeDevolucion;
+	private volatile CountDownLatch soltarDevolucion;
 	private final AtomicInteger llamadasCobro = new AtomicInteger();
 
 	public void modo(Modo nuevo) {
@@ -43,6 +51,10 @@ public class PasarelaDePrueba implements PasarelaPagos {
 		preparados.clear();
 		cobrados.clear();
 		devoluciones.clear();
+		montosDevueltos.clear();
+		llamadasDevolucion.clear();
+		dentroDeDevolucion = null;
+		soltarDevolucion = null;
 		llamadasCobro.set(0);
 	}
 
@@ -56,6 +68,25 @@ public class PasarelaDePrueba implements PasarelaPagos {
 
 	public int devoluciones() {
 		return devoluciones.size();
+	}
+
+	/** Cada llamada a devolver, en orden: "referencia monto clave intento". */
+	public List<String> llamadasDevolucion() {
+		return List.copyOf(llamadasDevolucion);
+	}
+
+	/**
+	 * La siguiente devolución avisa con {@code dentro} que llegó a la pasarela y espera
+	 * {@code soltar} antes de responder.
+	 */
+	public void detenerSiguienteDevolucion(CountDownLatch dentro, CountDownLatch soltar) {
+		this.dentroDeDevolucion = dentro;
+		this.soltarDevolucion = soltar;
+	}
+
+	/** Lo último que se pidió devolver de un cobro. */
+	public BigDecimal montoDevuelto(String referencia) {
+		return montosDevueltos.get(referencia);
 	}
 
 	@Override
@@ -93,9 +124,30 @@ public class PasarelaDePrueba implements PasarelaPagos {
 
 	@Override
 	public void devolver(String referencia, BigDecimal monto, String claveIdempotencia, int intento) {
+		llamadasDevolucion.add(referencia + " " + monto.stripTrailingZeros().toPlainString() + " "
+				+ claveIdempotencia + " " + intento);
+		CountDownLatch dentro = dentroDeDevolucion;
+		CountDownLatch soltar = soltarDevolucion;
+		if (dentro != null && soltar != null) {
+			dentroDeDevolucion = null;
+			dentro.countDown();
+			esperar(soltar);
+		}
 		if (modo == Modo.CAIDA || modo == Modo.SIN_CONEXION) {
 			throw new PasarelaNoDisponibleException("Caída simulada");
 		}
 		devoluciones.add(referencia);
+		montosDevueltos.put(referencia, monto);
+	}
+
+	private static void esperar(CountDownLatch soltar) {
+		try {
+			if (!soltar.await(30, TimeUnit.SECONDS)) {
+				throw new IllegalStateException("La prueba no soltó la devolución.");
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new PasarelaNoDisponibleException("Interrumpida", e);
+		}
 	}
 }

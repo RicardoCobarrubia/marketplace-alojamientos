@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import co.edu.unbosque.marketplace.reservas.aplicacion.CancelacionDTO;
+import co.edu.unbosque.marketplace.reservas.aplicacion.CancelacionService;
 import co.edu.unbosque.marketplace.reservas.aplicacion.GestionReservasService;
 import co.edu.unbosque.marketplace.reservas.aplicacion.ReservaDTO;
 import co.edu.unbosque.marketplace.reservas.aplicacion.ReservaService;
@@ -27,7 +28,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
-/** Reservas (MA-66 a MA-72). */
+/** Reservas (MA-66 a MA-74). */
 @RestController
 @RequestMapping("/api/reservas")
 @Tag(name = "Reservas")
@@ -36,12 +37,14 @@ public class ReservaController {
 	private final ReservaService reservaService;
 	private final ReservaTransacciones reservas;
 	private final GestionReservasService gestion;
+	private final CancelacionService cancelaciones;
 
 	public ReservaController(ReservaService reservaService, ReservaTransacciones reservas,
-			GestionReservasService gestion) {
+			GestionReservasService gestion, CancelacionService cancelaciones) {
 		this.reservaService = reservaService;
 		this.reservas = reservas;
 		this.gestion = gestion;
+		this.cancelaciones = cancelaciones;
 	}
 
 	/**
@@ -75,9 +78,10 @@ public class ReservaController {
 	}
 
 	@PostMapping("/{id}/cancelacion")
-	@Operation(summary = "Cancelar una reserva propia confirmada o en revisión, antes de la llegada")
+	@Operation(summary = "Cancelar una reserva confirmada o en revisión antes de la llegada (el huésped o un"
+			+ " administrador) y devolver según la política")
 	public ReservaDTO cancelar(@AuthenticationPrincipal Usuario usuario, @PathVariable Long id,
 			@Valid @RequestBody CancelacionDTO cancelacion) {
-		return gestion.cancelar(usuario, id, cancelacion.motivo());
+		return cancelaciones.cancelar(usuario, id, cancelacion.motivo());
 	}
 }
