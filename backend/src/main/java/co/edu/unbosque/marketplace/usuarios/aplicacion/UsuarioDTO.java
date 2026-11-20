@@ -40,7 +40,7 @@ public record UsuarioDTO(
 
 		@NotBlank(groups = { Registro.class, Perfil.class }, message = "El teléfono es obligatorio.")
 		/* Máximo 20 caracteres (la columna), con al menos 7 dígitos y un espacio como máximo entre ellos. */
-		@Pattern(groups = { Registro.class, Perfil.class }, regexp = "^(?=.{7,20}$)\\+?\\d(?: ?\\d){6,}$",
+		@Pattern(groups = { Registro.class, Perfil.class }, regexp = "^(?=.{7,20}$)\\+?\\d(?: ?\\d){6,19}$",
 				message = "El teléfono debe tener al menos 7 dígitos y máximo 20 caracteres.")
 		String telefono,
 
