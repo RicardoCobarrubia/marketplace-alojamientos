@@ -66,6 +66,7 @@ public class ReservaTransacciones {
 	private final PeriodoReservadoRepository periodoReservadoRepository;
 	private final CotizacionService cotizacionService;
 	private final EventosReserva eventos;
+	private final RevisionReservasService revisionReservas;
 	private final ObjectMapper json;
 	private final Clock reloj;
 	private final Duration retencion;
@@ -74,7 +75,7 @@ public class ReservaTransacciones {
 			AlojamientoRepository alojamientoRepository, UsuarioRepository usuarioRepository,
 			PeriodoDisponibleRepository periodoDisponibleRepository,
 			PeriodoReservadoRepository periodoReservadoRepository, CotizacionService cotizacionService,
-			EventosReserva eventos, ObjectMapper json, Clock reloj,
+			EventosReserva eventos, RevisionReservasService revisionReservas, ObjectMapper json, Clock reloj,
 			@Value("${marketplace.reservas.retencion:PT10M}") Duration retencion) {
 		this.reservaRepository = reservaRepository;
 		this.claveRepository = claveRepository;
@@ -84,6 +85,7 @@ public class ReservaTransacciones {
 		this.periodoReservadoRepository = periodoReservadoRepository;
 		this.cotizacionService = cotizacionService;
 		this.eventos = eventos;
+		this.revisionReservas = revisionReservas;
 		this.json = json;
 		this.reloj = reloj;
 		this.retencion = retencion;
@@ -184,8 +186,7 @@ public class ReservaTransacciones {
 		if (enModeracion(reserva)) {
 			// Bloquearon el alojamiento o restringieron a alguien mientras se pagaba: igual que
 			// las demás reservas confirmadas, queda en revisión (MA-80, MA-81)
-			reserva.ponerEnRevision(ahora);
-			eventos.publicar("RESERVA_EN_REVISION", reserva, Map.of("motivo", MODERADA_AL_PAGAR));
+			revisionReservas.ponerEnRevisionAlConfirmar(reserva, MODERADA_AL_PAGAR);
 		}
 		RespuestaReserva respuesta = new RespuestaReserva(HttpStatus.CREATED.value(),
 				json.writeValueAsString(ReservaDTO.desde(reserva)));

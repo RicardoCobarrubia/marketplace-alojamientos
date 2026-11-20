@@ -83,6 +83,15 @@ class RevisionReservasServiceTest {
 	}
 
 	@Test
+	void unaReservaConfirmadaDuranteLaModeracionTambienSeAudita() {
+		servicio.ponerEnRevisionAlConfirmar(reserva, "Durante el pago");
+
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.EN_REVISION);
+		verify(auditoria).registrar(EventoAuditoria.cambio("RESERVA_EN_REVISION", "RESERVA", 50L,
+				EstadoReserva.CONFIRMADA, EstadoReserva.EN_REVISION, "Durante el pago"));
+	}
+
+	@Test
 	void lasDelUsuarioTambien() {
 		when(reservaRepository.bloquearDelUsuarioDesde(2L, EstadoReserva.CONFIRMADA, HOY)).thenReturn(List.of());
 

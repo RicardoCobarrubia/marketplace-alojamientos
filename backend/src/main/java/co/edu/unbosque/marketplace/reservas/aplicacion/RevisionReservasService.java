@@ -71,6 +71,15 @@ public class RevisionReservasService {
 				motivo);
 	}
 
+	/**
+	 * Una reserva que se acaba de confirmar mientras su alojamiento estaba bloqueado o un usuario
+	 * restringido pasa a EN_REVISION, igual que las demás. Va en la transacción de la confirmación.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public void ponerEnRevisionAlConfirmar(Reserva reserva, String motivo) {
+		ponerEnRevision(List.of(reserva), motivo);
+	}
+
 	/** MA-82, escenario 1: las reservas EN_REVISION, las más recientes primero. */
 	@Transactional(readOnly = true)
 	public List<ReservaDTO> enRevision() {

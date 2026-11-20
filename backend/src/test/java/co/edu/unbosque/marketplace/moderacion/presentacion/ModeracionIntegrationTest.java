@@ -191,6 +191,13 @@ class ModeracionIntegrationTest {
 		assertThat(estado("reserva", pagando)).isEqualTo("EN_REVISION");
 		assertThat(jdbc.queryForList("SELECT tipo FROM evento_outbox WHERE agregado_id = ? ORDER BY id", String.class,
 				pagando)).containsExactly("RESERVA_CONFIRMADA", "RESERVA_EN_REVISION");
+		assertThat(auditados("accion = 'RESERVA_EN_REVISION' AND entidad_id = ? AND estado_anterior = 'CONFIRMADA'"
+				+ " AND estado_nuevo = 'EN_REVISION'", pagando)).isEqualTo(1);
+
+		// Un reintento con el mismo cobro no la cambia ni la vuelve a auditar
+		assertThat(transacciones.confirmar(pagando, "pi_tarde").requiereDevolucion()).isFalse();
+		assertThat(estado("reserva", pagando)).isEqualTo("EN_REVISION");
+		assertThat(auditados("accion = 'RESERVA_EN_REVISION' AND entidad_id = ?", pagando)).isEqualTo(1);
 	}
 
 	@Test
