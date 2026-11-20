@@ -20,6 +20,7 @@ import tools.jackson.databind.JsonNode;
  * también los administradores (escenario 1).</li>
  * <li>Pago fallido y devolución solicitada: el huésped (escenario 1).</li>
  * <li>Alojamiento aprobado, rechazado o bloqueado: el anfitrión (escenario 2).</li>
+ * <li>Reseña publicada: el anfitrión; reseña oculta o publicada de nuevo: el huésped (MA-79).</li>
  * </ul>
  */
 @Component
@@ -77,6 +78,14 @@ public class ReglasNotificacion {
 					"«%s» no fue aprobado: %s.".formatted(texto(datos, TITULO_ALOJAMIENTO), texto(datos, MOTIVO))));
 			case "ALOJAMIENTO_BLOQUEADO" -> avisos.add(new Aviso(id(datos, ANFITRION), "Alojamiento bloqueado",
 					"«%s» fue bloqueado: %s.".formatted(texto(datos, TITULO_ALOJAMIENTO), texto(datos, MOTIVO))));
+			case "RESENA_PUBLICADA" -> avisos.add(new Aviso(id(datos, ANFITRION), "Nueva reseña",
+					"«%s» recibió una reseña de %d estrellas.".formatted(texto(datos, TITULO_ALOJAMIENTO),
+							id(datos, "calificacion"))));
+			case "RESENA_OCULTA" -> avisos.add(new Aviso(id(datos, HUESPED), "Reseña oculta",
+					"Tu reseña de «%s» fue ocultada por moderación: %s.".formatted(texto(datos, TITULO_ALOJAMIENTO),
+							texto(datos, MOTIVO))));
+			case "RESENA_VISIBLE" -> avisos.add(new Aviso(id(datos, HUESPED), "Reseña publicada de nuevo",
+					"Tu reseña de «%s» vuelve a estar publicada.".formatted(texto(datos, TITULO_ALOJAMIENTO))));
 			default -> {
 				// Sin regla: el evento se marca entregado sin notificar a nadie
 			}

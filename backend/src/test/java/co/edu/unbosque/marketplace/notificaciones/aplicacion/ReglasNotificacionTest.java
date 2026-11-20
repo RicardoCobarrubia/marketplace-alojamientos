@@ -91,4 +91,23 @@ class ReglasNotificacionTest {
 	void losPesosVanSinDecimalesConPuntoDeMiles() {
 		assertThat(ReglasNotificacion.pesos(new BigDecimal("1234567.50"))).isEqualTo("$1.234.568");
 	}
+
+	@Test
+	void lasResenasSeNotificanAlAnfitrionYSuModeracionAlHuesped() {
+		String resena = """
+				{"resenaId":7,"huespedId":2,"anfitrionId":1,"titulo":"Casa en la playa","calificacion":4,
+				 "motivo":"Lenguaje ofensivo"}""";
+
+		assertThat(avisos("RESENA_PUBLICADA", resena)).singleElement()
+				.satisfies(aviso -> {
+					assertThat(aviso.usuarioId()).isEqualTo(1L);
+					assertThat(aviso.mensaje()).isEqualTo("«Casa en la playa» recibió una reseña de 4 estrellas.");
+				});
+		assertThat(avisos("RESENA_OCULTA", resena)).singleElement()
+				.satisfies(aviso -> {
+					assertThat(aviso.usuarioId()).isEqualTo(2L);
+					assertThat(aviso.mensaje()).contains("Lenguaje ofensivo");
+				});
+		assertThat(avisos("RESENA_VISIBLE", resena)).extracting(Aviso::usuarioId).containsExactly(2L);
+	}
 }

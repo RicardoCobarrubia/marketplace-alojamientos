@@ -48,7 +48,8 @@ class ArquitecturaTest {
 					"..marketplace.usuarios..", "..marketplace.alojamientos..",
 					"..marketplace.disponibilidad..", "..marketplace.cotizacion..",
 					"..marketplace.reservas..", "..marketplace.pagos..",
-					"..marketplace.notificaciones..", "..marketplace.auditoria..", "..marketplace.moderacion..");
+					"..marketplace.notificaciones..", "..marketplace.auditoria..", "..marketplace.moderacion..",
+					"..marketplace.resenas..");
 
 	/**
 	 * ADR-006 (ASR-04): fuera del módulo de pagos nadie usa los adaptadores, solo el puerto
