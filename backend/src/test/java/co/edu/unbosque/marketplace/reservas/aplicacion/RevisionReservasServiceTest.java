@@ -27,8 +27,6 @@ import org.springframework.data.jpa.domain.Specification;
 
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
-import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
-import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.cotizacion.dominio.CalculadoraCotizacion;
 import co.edu.unbosque.marketplace.cotizacion.dominio.ConfiguracionCotizacion;
@@ -49,15 +47,13 @@ class RevisionReservasServiceTest {
 	private ReservaRepository reservaRepository;
 	@Mock
 	private EventosReserva eventos;
-	@Mock
-	private Auditoria auditoria;
 
 	private RevisionReservasService servicio;
 	private Reserva reserva;
 
 	@BeforeEach
 	void preparar() {
-		servicio = new RevisionReservasService(reservaRepository, eventos, auditoria, Clock.fixed(AHORA, ZoneOffset.UTC),
+		servicio = new RevisionReservasService(reservaRepository, eventos, Clock.fixed(AHORA, ZoneOffset.UTC),
 				ZoneId.of("America/Bogota"));
 		Alojamiento alojamiento = TestDatos.alojamiento(10L, TestDatos.usuario(1L, Rol.ANFITRION, "hash"));
 		reserva = new Reserva(TestDatos.usuario(2L, Rol.HUESPED, "hash", "huesped@correo.com"), alojamiento,
@@ -77,9 +73,7 @@ class RevisionReservasServiceTest {
 		assertThat(servicio.ponerEnRevisionDelAlojamiento(10L, "Bloqueado")).isEqualTo(1);
 
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.EN_REVISION);
-		verify(eventos).publicar("RESERVA_EN_REVISION", reserva, Map.of("motivo", "Bloqueado"));
-		verify(auditoria).registrar(EventoAuditoria.cambio("RESERVA_EN_REVISION", "RESERVA", 50L,
-				EstadoReserva.CONFIRMADA, EstadoReserva.EN_REVISION, "Bloqueado"));
+		verify(eventos).publicar("RESERVA_EN_REVISION", reserva, EstadoReserva.CONFIRMADA, Map.of("motivo", "Bloqueado"));
 	}
 
 	@Test
@@ -87,8 +81,8 @@ class RevisionReservasServiceTest {
 		servicio.ponerEnRevisionAlConfirmar(reserva, "Durante el pago");
 
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.EN_REVISION);
-		verify(auditoria).registrar(EventoAuditoria.cambio("RESERVA_EN_REVISION", "RESERVA", 50L,
-				EstadoReserva.CONFIRMADA, EstadoReserva.EN_REVISION, "Durante el pago"));
+		verify(eventos).publicar("RESERVA_EN_REVISION", reserva, EstadoReserva.CONFIRMADA,
+				Map.of("motivo", "Durante el pago"));
 	}
 
 	@Test
@@ -114,9 +108,7 @@ class RevisionReservasServiceTest {
 		when(reservaRepository.buscarParaActualizar(50L)).thenReturn(Optional.of(reserva));
 
 		assertThat(servicio.mantener(50L).estado()).isEqualTo(EstadoReserva.CONFIRMADA);
-		verify(eventos).publicar("RESERVA_MANTENIDA", reserva);
-		verify(auditoria).registrar(EventoAuditoria.cambio("MANTENER_RESERVA", "RESERVA", 50L,
-				EstadoReserva.EN_REVISION, EstadoReserva.CONFIRMADA, null));
+		verify(eventos).publicar("RESERVA_MANTENIDA", reserva, EstadoReserva.EN_REVISION);
 	}
 
 	@Test

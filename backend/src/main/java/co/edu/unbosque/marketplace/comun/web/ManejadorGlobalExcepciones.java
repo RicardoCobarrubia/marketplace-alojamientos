@@ -86,6 +86,7 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(Exception.class)
 	public ProblemDetail manejarErrorInesperado(Exception ex) {
 		log.error("Error no controlado", ex);
+		auditar(EventoAuditoria.error(recursoActual(), ex.getClass().getSimpleName()));
 		ProblemDetail problema = crear(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
 				"Ocurrió un error inesperado. Reporta el id de correlación para revisarlo.");
 		problema.setProperty(CODIGO, "ERROR_INTERNO");
@@ -111,15 +112,23 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 	 * escenario 3). Si el registro falla, la respuesta 403 se da igual.
 	 */
 	private void auditarAccesoDenegado() {
-		String recurso = "desconocido";
-		if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes atributos) {
-			recurso = atributos.getRequest().getMethod() + " " + atributos.getRequest().getRequestURI();
-		}
+		auditar(EventoAuditoria.accesoDenegado(recursoActual()));
+	}
+
+	/** Si el registro falla, la respuesta se da igual. */
+	private void auditar(EventoAuditoria evento) {
 		try {
-			auditoria.registrar(EventoAuditoria.accesoDenegado(recurso));
+			auditoria.registrar(evento);
 		} catch (RuntimeException e) {
-			log.warn("No se pudo auditar un acceso denegado", e);
+			log.warn("No se pudo registrar un evento de auditoría ({})", evento.accion(), e);
 		}
+	}
+
+	private static String recursoActual() {
+		if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes atributos) {
+			return atributos.getRequest().getMethod() + " " + atributos.getRequest().getRequestURI();
+		}
+		return "desconocido";
 	}
 
 	private ProblemDetail crear(HttpStatus estado, String titulo, String detalle) {

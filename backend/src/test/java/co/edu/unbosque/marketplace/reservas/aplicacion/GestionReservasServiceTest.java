@@ -123,7 +123,7 @@ class GestionReservasServiceTest {
 		assertThat(cancelada.motivoCancelacion()).isEqualTo("Cambio de planes");
 		assertThat(cancelada.devolucionPendiente()).isTrue();
 		assertThat(fechas.getLiberadoEn()).isEqualTo(AHORA);
-		verify(eventos).publicar("RESERVA_CANCELADA", reserva, Map.of("motivo", "Cambio de planes",
+		verify(eventos).publicar("RESERVA_CANCELADA", reserva, EstadoReserva.CONFIRMADA, Map.of("motivo", "Cambio de planes",
 				"canceladaPor", Rol.HUESPED, "valorDevolucion", reserva.getTotal()));
 	}
 
@@ -172,7 +172,7 @@ class GestionReservasServiceTest {
 
 		assertThatThrownBy(() -> servicio.cancelar(anfitrion, 50L, "Motivo"))
 				.isInstanceOf(AccesoDenegadoException.class);
-		verify(eventos, never()).publicar(anyString(), any(), anyMap());
+		verify(eventos, never()).publicar(anyString(), any(), any(), anyMap());
 	}
 
 	// ─────────────────────────────────────────
@@ -195,7 +195,7 @@ class GestionReservasServiceTest {
 		TestDatos.asignar(reserva, "fechaSalida", LocalDate.of(2026, 11, 7));
 		assertThat(servicio.completar(50L)).isTrue();
 		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.COMPLETADA);
-		verify(eventos).publicar("RESERVA_COMPLETADA", reserva);
+		verify(eventos).publicar("RESERVA_COMPLETADA", reserva, EstadoReserva.CONFIRMADA);
 	}
 
 	@Test

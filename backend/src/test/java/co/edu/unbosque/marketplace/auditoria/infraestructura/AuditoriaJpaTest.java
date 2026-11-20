@@ -75,4 +75,18 @@ class AuditoriaJpaTest {
 		assertThat(registro.getAccion()).isEqualTo("ACCESO_DENEGADO");
 		assertThat(registro.getDetalle()).hasSize(1000);
 	}
+
+	@Test
+	void unActorExplicitoTienePrioridadSobreLaSesion() {
+		Usuario administrador = TestDatos.usuario(3L, Rol.ADMINISTRADOR, "hash");
+		SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken
+				.authenticated(administrador, null, administrador.getAuthorities()));
+
+		auditoria.registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", 7L, EventoAuditoria.Resultado.EXITO,
+				null).conActor(7L, Rol.HUESPED));
+
+		RegistroAuditoria registro = guardado();
+		assertThat(registro.getActorId()).isEqualTo(7L);
+		assertThat(registro.getActorRol()).isEqualTo("HUESPED");
+	}
 }

@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.ServicioAdicional;
@@ -43,15 +45,18 @@ public class CotizacionService {
 	private final AlojamientoRepository alojamientoRepository;
 	private final ConfiguracionCotizacionRepository configuracionRepository;
 	private final CalculadoraCotizacion calculadora;
+	private final Auditoria auditoria;
 	private final Clock reloj;
 	private final ZoneId zonaHoraria;
 
 	public CotizacionService(AlojamientoRepository alojamientoRepository,
-			ConfiguracionCotizacionRepository configuracionRepository, CalculadoraCotizacion calculadora, Clock reloj,
+			ConfiguracionCotizacionRepository configuracionRepository, CalculadoraCotizacion calculadora,
+			Auditoria auditoria, Clock reloj,
 			@Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
 		this.alojamientoRepository = alojamientoRepository;
 		this.configuracionRepository = configuracionRepository;
 		this.calculadora = calculadora;
+		this.auditoria = auditoria;
 		this.reloj = reloj;
 		this.zonaHoraria = zonaHoraria;
 	}
@@ -109,16 +114,27 @@ public class CotizacionService {
 	@Transactional
 	public ConfiguracionCotizacionDTO actualizarConfiguracion(Usuario administrador, ConfiguracionCotizacionDTO datos) {
 		ConfiguracionCotizacion configuracion = configuracionActual();
+		String anterior = resumen(ConfiguracionCotizacionDTO.desde(configuracion));
 		configuracion.actualizar(datos.porcentajeTarifaServicio(), datos.porcentajeDescuentoEstadiaLarga(),
 				datos.minimoNochesDescuento(), administrador.getId(), reloj.instant());
 		configuracionRepository.saveAndFlush(configuracion);
 		log.info("Configuración de cotización actualizada (administrador {})", administrador.getId()); // NOSONAR: solo un id numérico
-		return ConfiguracionCotizacionDTO.desde(configuracion);
+		ConfiguracionCotizacionDTO actualizada = ConfiguracionCotizacionDTO.desde(configuracion);
+		auditoria.registrar(EventoAuditoria.accion("ACTUALIZAR_CONFIGURACION_COTIZACION", "CONFIGURACION_COTIZACION",
+				(long) ConfiguracionCotizacion.ID_UNICO, EventoAuditoria.Resultado.EXITO,
+				"Antes: " + anterior + ". Ahora: " + resumen(actualizada) + "."));
+		return actualizada;
 	}
 
 	// ─────────────────────────────────────────
 	// Auxiliares
 	// ─────────────────────────────────────────
+
+	private static String resumen(ConfiguracionCotizacionDTO configuracion) {
+		return "tarifa " + configuracion.porcentajeTarifaServicio() + " %, descuento "
+				+ configuracion.porcentajeDescuentoEstadiaLarga() + " % desde " + configuracion.minimoNochesDescuento()
+				+ " noches";
+	}
 
 	private ConfiguracionCotizacion configuracionActual() {
 		return configuracionRepository.findById(ConfiguracionCotizacion.ID_UNICO)

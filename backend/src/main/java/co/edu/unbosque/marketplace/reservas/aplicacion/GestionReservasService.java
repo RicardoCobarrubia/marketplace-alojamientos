@@ -103,6 +103,7 @@ public class GestionReservasService {
 			throw new AccesoDenegadoException("Solo el huésped que hizo la reserva o un administrador puede cancelarla.");
 		}
 		Instant ahora = reloj.instant();
+		EstadoReserva anterior = reserva.getEstado();
 		reserva.cancelar(usuario.getId(), motivo, devolucion(reserva, ahora, porAdministrador), hoy(), ahora);
 		periodoReservadoRepository.bloquearPorReserva(reservaId)
 				.filter(fechas -> fechas.getLiberadoEn() == null)
@@ -111,7 +112,7 @@ public class GestionReservasService {
 		datos.put("motivo", reserva.getMotivoCancelacion());
 		datos.put("canceladaPor", usuario.getRol());
 		datos.put("valorDevolucion", reserva.getValorDevolucion());
-		eventos.publicar("RESERVA_CANCELADA", reserva, datos);
+		eventos.publicar("RESERVA_CANCELADA", reserva, anterior, datos);
 		log.info("Reserva {} cancelada", reserva.getId());
 		return ReservaDTO.desde(reserva);
 	}
@@ -152,7 +153,7 @@ public class GestionReservasService {
 		if (reserva == null || !reserva.completar(hoy(), reloj.instant())) {
 			return false;
 		}
-		eventos.publicar("RESERVA_COMPLETADA", reserva);
+		eventos.publicar("RESERVA_COMPLETADA", reserva, EstadoReserva.CONFIRMADA);
 		log.info("Reserva {} completada", reservaId);
 		return true;
 	}

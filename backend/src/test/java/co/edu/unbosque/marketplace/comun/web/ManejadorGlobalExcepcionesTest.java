@@ -104,4 +104,11 @@ class ManejadorGlobalExcepcionesTest {
 		doThrow(new IllegalStateException("caída")).when(auditoria).registrar(any());
 		assertThat(manejador.manejarAccesoDenegado(new AccessDeniedException("denegado")).getStatus()).isEqualTo(403);
 	}
+
+	@Test
+	void unErrorInesperadoQuedaAuditadoSinSuMensaje() {
+		manejador.manejarErrorInesperado(new IllegalStateException("dato sensible"));
+
+		verify(auditoria).registrar(EventoAuditoria.error("desconocido", "IllegalStateException"));
+	}
 }

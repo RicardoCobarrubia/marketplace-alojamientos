@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Ciudad;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Servicio;
 import co.edu.unbosque.marketplace.alojamientos.dominio.TipoAlojamiento;
@@ -31,13 +33,16 @@ public class CatalogoService {
 	private final TipoAlojamientoRepository tipoRepository;
 	private final ServicioRepository servicioRepository;
 	private final PoliticaCancelacionRepository politicaRepository;
+	private final Auditoria auditoria;
 
 	public CatalogoService(CiudadRepository ciudadRepository, TipoAlojamientoRepository tipoRepository,
-			ServicioRepository servicioRepository, PoliticaCancelacionRepository politicaRepository) {
+			ServicioRepository servicioRepository, PoliticaCancelacionRepository politicaRepository,
+			Auditoria auditoria) {
 		this.ciudadRepository = ciudadRepository;
 		this.tipoRepository = tipoRepository;
 		this.servicioRepository = servicioRepository;
 		this.politicaRepository = politicaRepository;
+		this.auditoria = auditoria;
 	}
 
 	// ─────────────────────────────────────────
@@ -76,6 +81,7 @@ public class CatalogoService {
 		}
 		Ciudad ciudad = ciudadRepository.save(new Ciudad(solicitud.nombre(), solicitud.departamento()));
 		log.info("Ciudad agregada al catálogo (ciudad {})", ciudad.getId());
+		auditarAlta("CREAR_CIUDAD", "CIUDAD", ciudad.getId().longValue(), ciudad.getNombre());
 		return CiudadDTO.desde(ciudad);
 	}
 
@@ -86,6 +92,7 @@ public class CatalogoService {
 		}
 		TipoAlojamiento tipo = tipoRepository.save(new TipoAlojamiento(solicitud.codigo(), solicitud.nombre()));
 		log.info("Tipo de alojamiento agregado al catálogo ({})", tipo.getCodigo());
+		auditarAlta("CREAR_TIPO_ALOJAMIENTO", "TIPO_ALOJAMIENTO", tipo.getId().longValue(), tipo.getCodigo());
 		return TipoAlojamientoDTO.desde(tipo);
 	}
 
@@ -96,6 +103,12 @@ public class CatalogoService {
 		}
 		Servicio servicio = servicioRepository.save(new Servicio(solicitud.codigo(), solicitud.nombre()));
 		log.info("Servicio agregado al catálogo ({})", servicio.getCodigo());
+		auditarAlta("CREAR_SERVICIO", "SERVICIO", servicio.getId().longValue(), servicio.getCodigo());
 		return ServicioDTO.desde(servicio);
+	}
+
+	/** Acción administrativa auditada en la misma transacción que el alta (MA-87). */
+	private void auditarAlta(String accion, String entidad, Long id, String detalle) {
+		auditoria.registrar(EventoAuditoria.accion(accion, entidad, id, EventoAuditoria.Resultado.EXITO, detalle));
 	}
 }
