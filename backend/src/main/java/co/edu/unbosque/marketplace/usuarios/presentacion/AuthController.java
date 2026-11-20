@@ -16,7 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-/** Registro e inicio de sesión. Son las únicas rutas de la API que no piden token. */
+/** Registro, inicio de sesión y reactivación de la cuenta: las rutas de la API que no piden token. */
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Autenticación")
@@ -44,5 +44,12 @@ public class AuthController {
 	@Operation(summary = "Iniciar sesión y obtener el token (MA-48)")
 	public AuthResponse login(@Validated(UsuarioDTO.Login.class) @RequestBody UsuarioDTO datos) {
 		return autenticacionService.iniciarSesion(datos);
+	}
+
+	// POST /api/auth/reactivacion — MA-52
+	@PostMapping("/reactivacion")
+	@Operation(summary = "Reactivar mi cuenta desactivada con mis credenciales y obtener el token (MA-52)")
+	public AuthResponse reactivar(@Validated(UsuarioDTO.Login.class) @RequestBody UsuarioDTO datos) {
+		return autenticacionService.reactivar(datos);
 	}
 }

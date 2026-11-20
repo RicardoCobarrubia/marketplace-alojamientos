@@ -206,6 +206,36 @@ public class Usuario implements UserDetails {
 	}
 
 	// ─────────────────────────────────────────
+	// Perfil y estado de la cuenta — MA-51, MA-52
+	// ─────────────────────────────────────────
+
+	/** Solo el nombre y el teléfono se pueden cambiar; el correo y el rol no (MA-51, escenario 2). */
+	public void actualizarPerfil(String nombre, String telefono) {
+		this.nombre = nombre.trim();
+		this.telefono = telefono.trim();
+	}
+
+	/**
+	 * El dueño desactiva su cuenta: no puede iniciar sesión hasta reactivarla y todos sus tokens
+	 * dejan de valer, porque cambia la versión de sesión (MA-52, escenario 1).
+	 */
+	public void desactivar() {
+		if (estadoCuenta != EstadoCuenta.ACTIVA) {
+			throw new ReglaNegocioException("CUENTA_NO_ACTIVA", "Solo se puede desactivar una cuenta activa.");
+		}
+		this.estadoCuenta = EstadoCuenta.DESACTIVADA;
+		this.versionSesion++;
+	}
+
+	/** El dueño la reactiva al iniciar sesión y confirmar (MA-52, escenario 3). */
+	public void reactivar() {
+		if (estadoCuenta != EstadoCuenta.DESACTIVADA) {
+			throw new ReglaNegocioException("CUENTA_NO_DESACTIVADA", "La cuenta no está desactivada.");
+		}
+		this.estadoCuenta = EstadoCuenta.ACTIVA;
+	}
+
+	// ─────────────────────────────────────────
 	// Moderación — MA-81
 	// ─────────────────────────────────────────
 

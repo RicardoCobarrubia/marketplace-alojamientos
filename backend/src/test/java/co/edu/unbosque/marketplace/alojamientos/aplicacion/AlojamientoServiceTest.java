@@ -195,4 +195,23 @@ class AlojamientoServiceTest {
 		assertThatThrownBy(() -> servicio.agregarServicioAdicional(administrador, 10L, desayuno))
 				.isInstanceOf(AccesoDenegadoException.class);
 	}
+
+	// ─────────────────────────────────────────
+	// Desactivación del anfitrión — MA-52
+	// ─────────────────────────────────────────
+
+	@Test
+	void pausaTodosLosActivosDelAnfitrionYAuditaCadaUno() {
+		alojamiento.enviarARevision(AHORA);
+		alojamiento.cambiarEstado(EstadoAlojamiento.ACTIVA, AHORA);
+		when(alojamientoRepository.findByAnfitrionIdAndEstado(1L, EstadoAlojamiento.ACTIVA))
+				.thenReturn(List.of(alojamiento));
+
+		assertThat(servicio.pausarTodosDelAnfitrion(1L, "Cuenta desactivada")).isEqualTo(1);
+
+		assertThat(alojamiento.getEstado()).isEqualTo(EstadoAlojamiento.PAUSADA);
+		verify(alojamientoRepository).flush();
+		verify(auditoria).registrar(EventoAuditoria.cambio("PAUSAR_ALOJAMIENTO", "ALOJAMIENTO", 10L,
+				EstadoAlojamiento.ACTIVA, EstadoAlojamiento.PAUSADA, "Cuenta desactivada"));
+	}
 }

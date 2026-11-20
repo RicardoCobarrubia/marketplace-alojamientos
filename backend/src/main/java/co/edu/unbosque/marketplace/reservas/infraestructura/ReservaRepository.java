@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.reservas.infraestructura;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,6 +65,17 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long>, JpaSpec
 			order by r.id""")
 	List<Reserva> bloquearDelUsuarioDesde(@Param("usuarioId") Long usuarioId, @Param("estado") EstadoReserva estado,
 			@Param("desde") LocalDate desde);
+
+	/**
+	 * Cuántas reservas de un usuario, como huésped o como anfitrión del alojamiento, están en
+	 * alguno de los estados y todavía no terminan (MA-52).
+	 */
+	@Query("""
+			select count(r) from Reserva r
+			where (r.huesped.id = :usuarioId or r.alojamiento.anfitrion.id = :usuarioId)
+			  and r.estado in :estados and r.fechaSalida > :hoy""")
+	long contarSinTerminarDelUsuario(@Param("usuarioId") Long usuarioId,
+			@Param("estados") Collection<EstadoReserva> estados, @Param("hoy") LocalDate hoy);
 
 	/** Reservas en un estado cuya fecha de salida ya llegó (MA-71, escenario 3). */
 	@Query("""

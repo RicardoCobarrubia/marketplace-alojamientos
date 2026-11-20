@@ -34,7 +34,7 @@ import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 
 /**
- * Registro, inicio de sesión y consulta de usuarios (MA-47, MA-48).
+ * Registro, inicio de sesión, perfil y reactivación de usuarios (MA-47, MA-48, MA-51, MA-52).
  * <p>
  * El login usa el {@code AuthenticationManager} de Spring Security, como en Software 1, y responde
  * con excepciones en lugar de códigos numéricos. El token lo genera el controlador con JwtUtil.
@@ -52,18 +52,20 @@ public class UsuarioService {
 	private final PasswordEncoder passwordEncoder;
 	private final AuthenticationManager authenticationManager;
 	private final Auditoria auditoria;
+	private final SesionesEnCache sesiones;
 	private final Clock reloj;
 	private final int intentosMaximos;
 	private final Duration duracionBloqueo;
 
 	public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder,
-			AuthenticationManager authenticationManager, Auditoria auditoria, Clock reloj,
+			AuthenticationManager authenticationManager, Auditoria auditoria, SesionesEnCache sesiones, Clock reloj,
 			@Value("${marketplace.seguridad.intentos-maximos}") int intentosMaximos,
 			@Value("${marketplace.seguridad.duracion-bloqueo}") Duration duracionBloqueo) {
 		this.usuarioRepository = usuarioRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.authenticationManager = authenticationManager;
 		this.auditoria = auditoria;
+		this.sesiones = sesiones;
 		this.reloj = reloj;
 		this.intentosMaximos = intentosMaximos;
 		this.duracionBloqueo = duracionBloqueo;
@@ -125,6 +127,24 @@ public class UsuarioService {
 			CuentaBloqueadaTemporalmenteException.class, CuentaRestringidaException.class,
 			CuentaDesactivadaException.class })
 	public Usuario iniciarSesion(UsuarioDTO solicitud) {
+		return autenticar(solicitud, false);
+	}
+
+	/**
+	 * Reactiva una cuenta desactivada por su dueño (MA-52, escenario 3): el usuario inicia sesión,
+	 * el sistema le responde que la cuenta está desactivada y él confirma con las mismas
+	 * credenciales. Tiene las mismas protecciones del inicio de sesión: la contraseña se revisa
+	 * primero, los intentos fallidos cuentan y una cuenta restringida sigue sin entrar. Sus
+	 * alojamientos siguen en PAUSADA: el anfitrión decide cuándo reanudarlos. Si la cuenta ya
+	 * estaba activa, es un inicio de sesión normal.
+	 */
+	@Transactional(noRollbackFor = { CredencialesInvalidasException.class,
+			CuentaBloqueadaTemporalmenteException.class, CuentaRestringidaException.class })
+	public Usuario reactivar(UsuarioDTO solicitud) {
+		return autenticar(solicitud, true);
+	}
+
+	private Usuario autenticar(UsuarioDTO solicitud, boolean reactivar) {
 		Instant ahora = reloj.instant();
 		String email = Usuario.normalizarEmail(solicitud.email());
 		Optional<Usuario> registrado = usuarioRepository.buscarParaLogin(email);
@@ -149,8 +169,14 @@ public class UsuarioService {
 			auditarInicioRechazado(registrado, "Cuenta restringida");
 			throw new CuentaRestringidaException();
 		} catch (DisabledException e) {
-			auditarInicioRechazado(registrado, "Cuenta desactivada");
-			throw new CuentaDesactivadaException();
+			// La contraseña ya se comprobó: Spring revisa el estado de la cuenta después
+			if (!reactivar || registrado.isEmpty()) {
+				auditarInicioRechazado(registrado, "Cuenta desactivada");
+				throw new CuentaDesactivadaException();
+			}
+			autenticacion = UsernamePasswordAuthenticationToken.authenticated(registrado.get(), null,
+					registrado.get().getAuthorities());
+			reactivarCuenta(registrado.get());
 		}
 
 		Usuario usuario = (Usuario) autenticacion.getPrincipal();
@@ -160,6 +186,16 @@ public class UsuarioService {
 		auditoria.registrar(EventoAuditoria.accion(INICIO_SESION, USUARIO, usuario.getId(), Resultado.EXITO, null)
 				.conActor(usuario.getId(), usuario.getRol()));
 		return usuario;
+	}
+
+	private void reactivarCuenta(Usuario usuario) {
+		usuario.reactivar();
+		log.info("Cuenta reactivada (usuario {})", usuario.getId());
+		auditoria.registrar(EventoAuditoria.cambio("REACTIVAR_CUENTA", USUARIO, usuario.getId(),
+				Usuario.EstadoCuenta.DESACTIVADA, Usuario.EstadoCuenta.ACTIVA, null)
+				.conActor(usuario.getId(), usuario.getRol()));
+		// Esta réplica pudo guardar la cuenta desactivada: sin olvidarla, el token nuevo no valdría
+		sesiones.olvidarAlConfirmar(usuario.getEmail());
 	}
 
 	/**
@@ -174,7 +210,7 @@ public class UsuarioService {
 	}
 
 	// ─────────────────────────────────────────
-	// Consulta
+	// Perfil — MA-51
 	// ─────────────────────────────────────────
 
 	@Transactional(readOnly = true)
@@ -182,6 +218,30 @@ public class UsuarioService {
 		return usuarioRepository.findById(usuarioId)
 				.map(UsuarioDTO::desde)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El usuario no existe."));
+	}
+
+	/**
+	 * Cambia el nombre y el teléfono del usuario de la sesión (escenario 2). El correo y el rol no
+	 * se pueden cambiar: si llegan distintos a los actuales se rechaza, en lugar de ignorarlos en
+	 * silencio. La contraseña tampoco se cambia aquí.
+	 */
+	@Transactional
+	public UsuarioDTO actualizarPerfil(Long usuarioId, UsuarioDTO cambios) {
+		Usuario usuario = usuarioRepository.buscarParaActualizar(usuarioId)
+				.orElseThrow(() -> new RecursoNoEncontradoException("El usuario no existe."));
+		boolean cambiaCorreo = cambios.email() != null
+				&& !Usuario.normalizarEmail(cambios.email()).equals(usuario.getEmail());
+		boolean cambiaRol = cambios.rol() != null && cambios.rol() != usuario.getRol();
+		if (cambiaCorreo || cambiaRol || cambios.password() != null) {
+			throw new SolicitudInvalidaException("CAMPO_NO_EDITABLE",
+					"Desde el perfil solo se pueden cambiar el nombre y el teléfono.");
+		}
+		usuario.actualizarPerfil(cambios.nombre(), cambios.telefono());
+		// Sin los datos personales: solo que el perfil cambió
+		auditoria.registrar(EventoAuditoria.accion("ACTUALIZAR_PERFIL", USUARIO, usuarioId, Resultado.EXITO, null)
+				.conActor(usuarioId, usuario.getRol()));
+		sesiones.olvidarAlConfirmar(usuario.getEmail());
+		return UsuarioDTO.desde(usuario);
 	}
 
 	private static ReglaNegocioException correoDuplicado() {

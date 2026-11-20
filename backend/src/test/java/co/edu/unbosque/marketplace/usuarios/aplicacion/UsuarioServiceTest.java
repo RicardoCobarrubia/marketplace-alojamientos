@@ -32,6 +32,7 @@ import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria.Resultado;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.TestDatos;
+import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.usuarios.dominio.CredencialesInvalidasException;
@@ -39,6 +40,7 @@ import co.edu.unbosque.marketplace.usuarios.dominio.CuentaBloqueadaTemporalmente
 import co.edu.unbosque.marketplace.usuarios.dominio.CuentaDesactivadaException;
 import co.edu.unbosque.marketplace.usuarios.dominio.CuentaRestringidaException;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
+import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
 import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 
@@ -55,6 +57,8 @@ class UsuarioServiceTest {
 	private UsuarioRepository usuarioRepository;
 	@Mock
 	private AuthenticationManager authenticationManager;
+	@Mock
+	private SesionesEnCache sesiones;
 
 	private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 	private UsuarioService servicio;
@@ -63,7 +67,7 @@ class UsuarioServiceTest {
 	@BeforeEach
 	void preparar() {
 		servicio = new UsuarioService(usuarioRepository, passwordEncoder, authenticationManager, auditoria,
-				Clock.fixed(AHORA, ZoneOffset.UTC), 5, Duration.ofMinutes(15));
+				sesiones, Clock.fixed(AHORA, ZoneOffset.UTC), 5, Duration.ofMinutes(15));
 		usuario = TestDatos.usuario(3L, Rol.HUESPED, "hash-real");
 	}
 
@@ -214,5 +218,104 @@ class UsuarioServiceTest {
 				.hasFieldOrPropertyWithValue("codigo", "CUENTA_DESACTIVADA");
 		verify(auditoria).registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", 3L, Resultado.RECHAZADO,
 				"Cuenta desactivada").conActor(3L, Rol.HUESPED));
+	}
+
+	// ─────────────────────────────────────────
+	// Reactivación — MA-52
+	// ─────────────────────────────────────────
+
+	@Test
+	void conLaContrasenaCorrectaReactivaLaCuentaDesactivadaYAbreLaSesion() {
+		usuario.desactivar();
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(authenticationManager.authenticate(any())).thenThrow(new DisabledException("x"));
+
+		Usuario reactivado = servicio.reactivar(LOGIN);
+
+		assertThat(reactivado).isSameAs(usuario);
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.ACTIVA);
+		verify(usuarioRepository).save(usuario);
+		verify(sesiones).olvidarAlConfirmar("ana@correo.com");
+		verify(auditoria).registrar(EventoAuditoria.cambio("REACTIVAR_CUENTA", "USUARIO", 3L,
+				EstadoCuenta.DESACTIVADA, EstadoCuenta.ACTIVA, null).conActor(3L, Rol.HUESPED));
+		verify(auditoria).registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", 3L, Resultado.EXITO, null)
+				.conActor(3L, Rol.HUESPED));
+	}
+
+	@Test
+	void sinLaContrasenaCorrectaNoSeReactivaYCuentaElIntentoFallido() {
+		usuario.desactivar();
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("x"));
+
+		assertThatThrownBy(() -> servicio.reactivar(LOGIN)).isInstanceOf(CredencialesInvalidasException.class);
+
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.DESACTIVADA);
+		assertThat(usuario.getIntentosFallidos()).isEqualTo((short) 1);
+		verify(sesiones, never()).olvidarAlConfirmar(any());
+	}
+
+	@Test
+	void unaCuentaRestringidaNoSeReactiva() {
+		usuario.restringir("Fraude");
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(authenticationManager.authenticate(any())).thenThrow(new LockedException("x"));
+
+		assertThatThrownBy(() -> servicio.reactivar(LOGIN)).isInstanceOf(CuentaRestringidaException.class);
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.RESTRINGIDA);
+	}
+
+	@Test
+	void siLaCuentaYaEstabaActivaEsUnInicioDeSesionNormal() {
+		when(usuarioRepository.buscarParaLogin("ana@correo.com")).thenReturn(Optional.of(usuario));
+		when(authenticationManager.authenticate(any()))
+				.thenReturn(UsernamePasswordAuthenticationToken.authenticated(usuario, null, usuario.getAuthorities()));
+
+		assertThat(servicio.reactivar(LOGIN)).isSameAs(usuario);
+		verify(sesiones, never()).olvidarAlConfirmar(any());
+	}
+
+	// ─────────────────────────────────────────
+	// Perfil — MA-51
+	// ─────────────────────────────────────────
+
+	private static UsuarioDTO perfil(String email, Rol rol, String password) {
+		return new UsuarioDTO(null, "Ana María", email, " 3109876543 ", password, rol, null);
+	}
+
+	@Test
+	void actualizaElNombreYElTelefonoYOlvidaLaSesionEnCache() {
+		when(usuarioRepository.buscarParaActualizar(3L)).thenReturn(Optional.of(usuario));
+
+		UsuarioDTO actualizado = servicio.actualizarPerfil(3L, perfil("ANA@correo.com", Rol.HUESPED, null));
+
+		assertThat(actualizado.nombre()).isEqualTo("Ana María");
+		assertThat(actualizado.telefono()).isEqualTo("3109876543");
+		assertThat(actualizado.email()).isEqualTo("ana@correo.com");
+		verify(sesiones).olvidarAlConfirmar("ana@correo.com");
+		verify(auditoria).registrar(EventoAuditoria.accion("ACTUALIZAR_PERFIL", "USUARIO", 3L, Resultado.EXITO, null)
+				.conActor(3L, Rol.HUESPED));
+	}
+
+	@Test
+	void elCorreoElRolYLaContrasenaNoSeCambianDesdeElPerfil() {
+		when(usuarioRepository.buscarParaActualizar(3L)).thenReturn(Optional.of(usuario));
+
+		for (UsuarioDTO cambios : new UsuarioDTO[] { perfil("otro@correo.com", null, null),
+				perfil(null, Rol.ANFITRION, null), perfil(null, null, "clave-nueva-1") }) {
+			assertThatThrownBy(() -> servicio.actualizarPerfil(3L, cambios))
+					.isInstanceOf(SolicitudInvalidaException.class)
+					.hasFieldOrPropertyWithValue("codigo", "CAMPO_NO_EDITABLE");
+		}
+		assertThat(usuario.getNombre()).isEqualTo("Ana Pérez");
+		verify(sesiones, never()).olvidarAlConfirmar(any());
+	}
+
+	@Test
+	void elPerfilDeUnUsuarioQueNoExisteResponde404() {
+		when(usuarioRepository.buscarParaActualizar(9L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> servicio.actualizarPerfil(9L, perfil(null, null, null)))
+				.isInstanceOf(RecursoNoEncontradoException.class);
 	}
 }

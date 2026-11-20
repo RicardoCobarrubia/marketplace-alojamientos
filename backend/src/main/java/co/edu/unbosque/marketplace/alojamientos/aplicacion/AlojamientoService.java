@@ -11,6 +11,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
@@ -173,6 +174,28 @@ public class AlojamientoService {
 	@Transactional
 	public AlojamientoDTO reanudar(Usuario anfitrion, Long alojamientoId) {
 		return cambiarEstadoDelDueno(anfitrion, alojamientoId, EstadoAlojamiento.PAUSADA, EstadoAlojamiento.ACTIVA);
+	}
+
+	/**
+	 * Pausa todos los alojamientos activos de un anfitrión, cada uno con su registro de auditoría
+	 * (MA-52). Corre dentro de la transacción de quien llama y escribe los cambios en la base de
+	 * datos antes de volver: desde ese momento una reserva nueva en ellos espera y luego los
+	 * encuentra pausados.
+	 *
+	 * @return cuántos alojamientos se pausaron
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public int pausarTodosDelAnfitrion(Long anfitrionId, String motivo) {
+		Instant ahora = reloj.instant();
+		List<Alojamiento> activos = alojamientoRepository.findByAnfitrionIdAndEstado(anfitrionId,
+				EstadoAlojamiento.ACTIVA);
+		for (Alojamiento alojamiento : activos) {
+			alojamiento.cambiarEstado(EstadoAlojamiento.PAUSADA, ahora);
+			auditoria.registrar(EventoAuditoria.cambio("PAUSAR_ALOJAMIENTO", ALOJAMIENTO, alojamiento.getId(),
+					EstadoAlojamiento.ACTIVA, EstadoAlojamiento.PAUSADA, motivo));
+		}
+		alojamientoRepository.flush();
+		return activos.size();
 	}
 
 	// ─────────────────────────────────────────

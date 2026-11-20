@@ -20,7 +20,8 @@ import jakarta.validation.constraints.Size;
  * <ul>
  * <li>{@code id} y {@code estadoCuenta} son de solo lectura: si el cliente los envía se ignoran.</li>
  * <li>{@code password} es de solo escritura: nunca sale en una respuesta.</li>
- * <li>Las validaciones dependen del caso con los grupos {@link Registro} y {@link Login}.</li>
+ * <li>Las validaciones dependen del caso con los grupos {@link Registro}, {@link Login} y
+ * {@link Perfil}.</li>
  * </ul>
  */
 public record UsuarioDTO(
@@ -28,8 +29,8 @@ public record UsuarioDTO(
 		@JsonProperty(access = Access.READ_ONLY)
 		Long id,
 
-		@NotBlank(groups = Registro.class, message = "El nombre es obligatorio.")
-		@Size(groups = Registro.class, max = 100, message = "El nombre admite máximo 100 caracteres.")
+		@NotBlank(groups = { Registro.class, Perfil.class }, message = "El nombre es obligatorio.")
+		@Size(groups = { Registro.class, Perfil.class }, max = 100, message = "El nombre admite máximo 100 caracteres.")
 		String nombre,
 
 		@NotBlank(groups = { Registro.class, Login.class }, message = "El correo es obligatorio.")
@@ -37,8 +38,8 @@ public record UsuarioDTO(
 		@Size(groups = Registro.class, max = 254, message = "El correo admite máximo 254 caracteres.")
 		String email,
 
-		@NotBlank(groups = Registro.class, message = "El teléfono es obligatorio.")
-		@Pattern(groups = Registro.class, regexp = "^\\+?[0-9][0-9 ]{6,18}$",
+		@NotBlank(groups = { Registro.class, Perfil.class }, message = "El teléfono es obligatorio.")
+		@Pattern(groups = { Registro.class, Perfil.class }, regexp = "^\\+?[0-9][0-9 ]{6,18}$",
 				message = "El teléfono debe tener entre 7 y 20 dígitos.")
 		String telefono,
 
@@ -59,8 +60,12 @@ public record UsuarioDTO(
 	public interface Registro {
 	}
 
-	/** Validaciones del inicio de sesión (MA-48): solo correo y contraseña. */
+	/** Validaciones del inicio de sesión (MA-48) y de la reactivación (MA-52): solo correo y contraseña. */
 	public interface Login {
+	}
+
+	/** Validaciones de la actualización del perfil (MA-51): solo nombre y teléfono. */
+	public interface Perfil {
 	}
 
 	/** Convierte la entidad en DTO. Nunca copia la contraseña. */

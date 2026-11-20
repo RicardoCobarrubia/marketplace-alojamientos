@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
+import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
@@ -112,6 +113,7 @@ public class ReservaTransacciones {
 		Instant ahora = reloj.instant();
 		ClaveIdempotencia registro = claveRepository.saveAndFlush(
 				new ClaveIdempotencia(huesped.getId(), clave, huella, ahora));
+		verificarCuentaActiva(huesped);
 
 		RangoFechas rango = cotizacionService.validarFechas(solicitud.llegada(), solicitud.salida());
 		Alojamiento alojamiento = alojamientoRepository.buscarParaReservar(solicitud.alojamientoId())
@@ -127,6 +129,20 @@ public class ReservaTransacciones {
 				new PeriodoReservado(alojamiento, reserva.getId(), rango, ahora.plus(retencion), ahora));
 		registro.asociar(reserva.getId());
 		return reserva;
+	}
+
+	/**
+	 * El token del huésped puede seguir valiendo hasta 60 s después de que desactiven o restrinjan
+	 * su cuenta (ADR-010): se revisa la cuenta en la base de datos con bloqueo compartido. Una
+	 * desactivación en curso termina antes y aquí se rechaza; una nueva espera a que esta reserva
+	 * se guarde y entonces la encuentra (MA-52). Va antes de bloquear el alojamiento, el mismo
+	 * orden de la desactivación y de la restricción.
+	 */
+	private void verificarCuentaActiva(Usuario huesped) {
+		List<String> estados = usuarioRepository.estadosConBloqueoCompartido(List.of(huesped.getId()));
+		if (!estados.contains(Usuario.EstadoCuenta.ACTIVA.name())) {
+			throw new AccesoDenegadoException("Tu cuenta no está activa.");
+		}
 	}
 
 	/** MA-66, escenarios 1 y 2. */
