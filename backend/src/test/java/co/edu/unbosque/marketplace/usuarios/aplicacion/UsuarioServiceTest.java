@@ -315,7 +315,9 @@ class UsuarioServiceTest {
 	void elPerfilDeUnUsuarioQueNoExisteResponde404() {
 		when(usuarioRepository.buscarParaActualizar(9L)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> servicio.actualizarPerfil(9L, perfil(null, null, null)))
+		UsuarioDTO cambios = perfil(null, null, null);
+
+		assertThatThrownBy(() -> servicio.actualizarPerfil(9L, cambios))
 				.isInstanceOf(RecursoNoEncontradoException.class);
 	}
 }

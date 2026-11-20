@@ -85,6 +85,11 @@ public class Usuario implements UserDetails {
 	@Column(name = "motivo_restriccion", length = 500)
 	private String motivoRestriccion;
 
+	/** Al levantar la restricción la cuenta vuelve a este estado (MA-52); nulo si no está restringida. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "estado_antes_de_restriccion", length = 20)
+	private EstadoCuenta estadoAntesDeRestriccion;
+
 	@Column(name = "creado_en", nullable = false, updatable = false)
 	private Instant creadoEn;
 
@@ -247,17 +252,24 @@ public class Usuario implements UserDetails {
 		if (estadoCuenta == EstadoCuenta.RESTRINGIDA) {
 			throw new ReglaNegocioException("YA_RESTRINGIDA", "La cuenta ya está restringida.");
 		}
+		this.estadoAntesDeRestriccion = estadoCuenta;
 		this.estadoCuenta = EstadoCuenta.RESTRINGIDA;
 		this.motivoRestriccion = motivo.strip();
 		this.versionSesion++;
 	}
 
-	/** El administrador levanta la restricción: la cuenta vuelve a estar activa. */
+	/**
+	 * El administrador levanta la restricción: la cuenta vuelve al estado que tenía. Si su dueño la
+	 * había desactivado sigue desactivada, porque solo él la reactiva confirmando con sus
+	 * credenciales (MA-52, escenario 3).
+	 */
 	public void levantarRestriccion() {
 		if (estadoCuenta != EstadoCuenta.RESTRINGIDA) {
 			throw new ReglaNegocioException("NO_RESTRINGIDA", "La cuenta no está restringida.");
 		}
-		this.estadoCuenta = EstadoCuenta.ACTIVA;
+		this.estadoCuenta = estadoAntesDeRestriccion == EstadoCuenta.DESACTIVADA ? EstadoCuenta.DESACTIVADA
+				: EstadoCuenta.ACTIVA;
+		this.estadoAntesDeRestriccion = null;
 		this.motivoRestriccion = null;
 	}
 

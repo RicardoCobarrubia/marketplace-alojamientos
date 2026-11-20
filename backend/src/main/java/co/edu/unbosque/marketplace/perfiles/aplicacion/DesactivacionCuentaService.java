@@ -26,8 +26,8 @@ import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
 import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 
 /**
- * El huésped o el anfitrión desactiva su cuenta (MA-52, escenarios 1 y 2). Todo ocurre en una
- * sola transacción: la cuenta, sus alojamientos pausados y el registro de auditoría.
+ * El huésped o el anfitrión desactiva su cuenta (MA-52, escenarios 1 y 2). La cuenta, sus
+ * alojamientos pausados y el registro de auditoría cambian en una sola transacción.
  */
 @Service
 public class DesactivacionCuentaService {
@@ -83,7 +83,7 @@ public class DesactivacionCuentaService {
 		int pausados = alojamientoService.pausarTodosDelAnfitrion(usuarioId, "Cuenta desactivada por su dueño");
 		LocalDate hoy = LocalDate.ofInstant(reloj.instant(), zonaHoraria);
 		if (reservaRepository.contarSinTerminarDelUsuario(usuarioId, COMPROMETIDAS, hoy) > 0) {
-			// Se deshace todo: la cuenta sigue activa y los alojamientos como estaban
+			// La transacción se deshace: la cuenta sigue activa y los alojamientos como estaban
 			throw new ReglaNegocioException("RESERVAS_VIGENTES", "Tienes reservas confirmadas que aún no terminan."
 					+ " Podrás desactivar la cuenta cuando terminen o se cancelen.");
 		}
@@ -91,6 +91,6 @@ public class DesactivacionCuentaService {
 				EstadoCuenta.DESACTIVADA, pausados > 0 ? pausados + " alojamientos pausados" : null)
 				.conActor(usuarioId, usuario.getRol()));
 		sesiones.olvidarAlConfirmar(usuario.getEmail());
-		log.info("Cuenta desactivada (usuario {}); {} alojamientos pausados", usuarioId, pausados);
+		log.info("Cuenta desactivada (usuario {}); {} alojamientos pausados", usuario.getId(), pausados);
 	}
 }

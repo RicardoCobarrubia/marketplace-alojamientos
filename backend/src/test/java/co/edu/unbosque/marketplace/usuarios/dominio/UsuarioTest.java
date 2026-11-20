@@ -143,6 +143,23 @@ class UsuarioTest {
 	}
 
 	@Test
+	void siEstabaDesactivadaAlLevantarLaRestriccionSigueDesactivada() {
+		Usuario usuario = TestDatos.usuario(1L, Rol.HUESPED, "hash");
+		usuario.desactivar();
+		usuario.restringir("Fraude");
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.RESTRINGIDA);
+
+		usuario.levantarRestriccion();
+
+		// Solo su dueño la reactiva, confirmando con sus credenciales
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.DESACTIVADA);
+		usuario.reactivar();
+		usuario.restringir("Otra vez");
+		usuario.levantarRestriccion();
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.ACTIVA);
+	}
+
+	@Test
 	void unaCuentaRestringidaNoSeDesactivaNiSeReactiva() {
 		Usuario usuario = TestDatos.usuario(1L, Rol.HUESPED, "hash");
 		usuario.restringir("Fraude");

@@ -39,7 +39,7 @@ public record UsuarioDTO(
 		String email,
 
 		@NotBlank(groups = { Registro.class, Perfil.class }, message = "El teléfono es obligatorio.")
-		@Pattern(groups = { Registro.class, Perfil.class }, regexp = "^\\+?[0-9][0-9 ]{6,18}$",
+		@Pattern(groups = { Registro.class, Perfil.class }, regexp = "^\\+?\\d[\\d ]{6,18}$",
 				message = "El teléfono debe tener entre 7 y 20 dígitos.")
 		String telefono,
 

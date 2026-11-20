@@ -125,13 +125,16 @@ public class ModeracionService {
 				usuario.getMotivoRestriccion(), enRevision, pausados);
 	}
 
-	/** Levanta la restricción: la cuenta vuelve a ACTIVA. Sus alojamientos siguen PAUSADA. */
+	/**
+	 * Levanta la restricción: la cuenta vuelve a ACTIVA, o sigue DESACTIVADA si su dueño la había
+	 * desactivado. Sus alojamientos siguen PAUSADA.
+	 */
 	@Transactional
 	public ResultadoModeracionDTO levantarRestriccion(Long usuarioId) {
 		Usuario usuario = usuario(usuarioId);
 		usuario.levantarRestriccion();
 		auditoria.registrar(EventoAuditoria.cambio("LEVANTAR_RESTRICCION", USUARIO, usuarioId,
-				EstadoCuenta.RESTRINGIDA, EstadoCuenta.ACTIVA, null));
+				EstadoCuenta.RESTRINGIDA, usuario.getEstadoCuenta(), null));
 		olvidarSesionAlConfirmar(usuario.getEmail());
 		return new ResultadoModeracionDTO(USUARIO, usuarioId, usuario.getEstadoCuenta().name(), null, 0, 0);
 	}
