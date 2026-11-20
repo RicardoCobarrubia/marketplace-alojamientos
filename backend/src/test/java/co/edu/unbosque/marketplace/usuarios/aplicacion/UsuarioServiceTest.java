@@ -28,6 +28,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria.Resultado;
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
@@ -47,6 +50,8 @@ class UsuarioServiceTest {
 			null, null);
 
 	@Mock
+	private Auditoria auditoria;
+	@Mock
 	private UsuarioRepository usuarioRepository;
 	@Mock
 	private AuthenticationManager authenticationManager;
@@ -57,7 +62,7 @@ class UsuarioServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new UsuarioService(usuarioRepository, passwordEncoder, authenticationManager,
+		servicio = new UsuarioService(usuarioRepository, passwordEncoder, authenticationManager, auditoria,
 				Clock.fixed(AHORA, ZoneOffset.UTC), 5, Duration.ofMinutes(15));
 		usuario = TestDatos.usuario(3L, Rol.HUESPED, "hash-real");
 	}
@@ -146,6 +151,8 @@ class UsuarioServiceTest {
 
 		assertThat(autenticado).isSameAs(usuario);
 		assertThat(autenticado.getIntentosFallidos()).isZero();
+		verify(auditoria).registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", 3L, Resultado.EXITO, null)
+				.conActor(3L, Rol.HUESPED));
 	}
 
 	@Test
@@ -155,6 +162,9 @@ class UsuarioServiceTest {
 
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
 				.isInstanceOf(CredencialesInvalidasException.class);
+		// Sin cuenta no se guarda qué correo se intentó
+		verify(auditoria).registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", null, Resultado.RECHAZADO,
+				"Credenciales inválidas"));
 	}
 
 	@Test
@@ -179,6 +189,8 @@ class UsuarioServiceTest {
 		assertThat(usuario.estaBloqueadoTemporalmente(AHORA)).isTrue();
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
 				.isInstanceOf(CuentaBloqueadaTemporalmenteException.class);
+		verify(auditoria).registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", 3L, Resultado.RECHAZADO,
+				"Cuenta bloqueada temporalmente").conActor(3L, Rol.HUESPED));
 	}
 
 	@Test
@@ -188,6 +200,8 @@ class UsuarioServiceTest {
 
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
 				.isInstanceOf(CuentaRestringidaException.class);
+		verify(auditoria).registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", 3L, Resultado.RECHAZADO,
+				"Cuenta restringida").conActor(3L, Rol.HUESPED));
 	}
 
 	@Test
@@ -198,5 +212,7 @@ class UsuarioServiceTest {
 		assertThatThrownBy(() -> servicio.iniciarSesion(LOGIN))
 				.isInstanceOf(CuentaDesactivadaException.class)
 				.hasFieldOrPropertyWithValue("codigo", "CUENTA_DESACTIVADA");
+		verify(auditoria).registrar(EventoAuditoria.accion("INICIO_SESION", "USUARIO", 3L, Resultado.RECHAZADO,
+				"Cuenta desactivada").conActor(3L, Rol.HUESPED));
 	}
 }

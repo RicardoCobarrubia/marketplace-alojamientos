@@ -13,8 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
-import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.reservas.dominio.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.dominio.Reserva;
@@ -30,19 +28,15 @@ import co.edu.unbosque.marketplace.reservas.infraestructura.ReservaRepository;
 @Service
 public class RevisionReservasService {
 
-	private static final String RESERVA = "RESERVA";
-
 	private final ReservaRepository reservaRepository;
 	private final EventosReserva eventos;
-	private final Auditoria auditoria;
 	private final Clock reloj;
 	private final ZoneId zonaHoraria;
 
-	public RevisionReservasService(ReservaRepository reservaRepository, EventosReserva eventos, Auditoria auditoria,
-			Clock reloj, @Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
+	public RevisionReservasService(ReservaRepository reservaRepository, EventosReserva eventos, Clock reloj,
+			@Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
 		this.reservaRepository = reservaRepository;
 		this.eventos = eventos;
-		this.auditoria = auditoria;
 		this.reloj = reloj;
 		this.zonaHoraria = zonaHoraria;
 	}
@@ -93,9 +87,7 @@ public class RevisionReservasService {
 		Reserva reserva = reservaRepository.buscarParaActualizar(reservaId)
 				.orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
 		reserva.mantener(reloj.instant());
-		eventos.publicar("RESERVA_MANTENIDA", reserva);
-		auditoria.registrar(EventoAuditoria.cambio("MANTENER_RESERVA", RESERVA, reservaId, EstadoReserva.EN_REVISION,
-				EstadoReserva.CONFIRMADA, null));
+		eventos.publicar("RESERVA_MANTENIDA", reserva, EstadoReserva.EN_REVISION);
 		return ReservaDTO.desde(reserva);
 	}
 
@@ -103,9 +95,7 @@ public class RevisionReservasService {
 		Instant ahora = reloj.instant();
 		for (Reserva reserva : reservas) {
 			reserva.ponerEnRevision(ahora);
-			eventos.publicar("RESERVA_EN_REVISION", reserva, Map.of("motivo", motivo));
-			auditoria.registrar(EventoAuditoria.cambio("RESERVA_EN_REVISION", RESERVA, reserva.getId(),
-					EstadoReserva.CONFIRMADA, EstadoReserva.EN_REVISION, motivo));
+			eventos.publicar("RESERVA_EN_REVISION", reserva, EstadoReserva.CONFIRMADA, Map.of("motivo", motivo));
 		}
 		return reservas.size();
 	}

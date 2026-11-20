@@ -182,7 +182,7 @@ public class ReservaTransacciones {
 		Instant ahora = reloj.instant();
 		reserva.confirmar(referenciaPago, ahora);
 		fechas.bloquearDefinitivamente();
-		eventos.publicar("RESERVA_CONFIRMADA", reserva);
+		eventos.publicar("RESERVA_CONFIRMADA", reserva, EstadoReserva.PENDIENTE_PAGO);
 		if (enModeracion(reserva)) {
 			// Bloquearon el alojamiento o restringieron a alguien mientras se pagaba: igual que
 			// las demás reservas confirmadas, queda en revisión (MA-80, MA-81)
@@ -224,7 +224,8 @@ public class ReservaTransacciones {
 		if (fechas.getLiberadoEn() == null) {
 			fechas.liberar(ahora);
 		}
-		eventos.publicar("PAGO_FALLIDO", reserva);
+		eventos.publicar("PAGO_FALLIDO", reserva, EstadoReserva.PENDIENTE_PAGO,
+				Map.of("motivo", detalle));
 		RespuestaReserva respuesta = new RespuestaReserva(estadoHttp.value(),
 				problema(estadoHttp, codigo, detalle, reserva.getId()));
 		terminarClave(reserva.getId(), respuesta, ahora);
@@ -271,7 +272,8 @@ public class ReservaTransacciones {
 		Reserva reserva = bloquear(reservaId);
 		if (reserva.isDevolucionPendiente()) {
 			reserva.devolucionSolicitada(reloj.instant());
-			eventos.publicar("DEVOLUCION_SOLICITADA", reserva, Map.of("valorDevolucion", reserva.getValorDevolucion()));
+			eventos.publicar("DEVOLUCION_SOLICITADA", reserva, reserva.getEstado(),
+					Map.of("valorDevolucion", reserva.getValorDevolucion()));
 		}
 	}
 

@@ -20,6 +20,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria.Resultado;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
@@ -42,21 +45,25 @@ public class UsuarioService {
 	private static final Logger log = LoggerFactory.getLogger(UsuarioService.class);
 	static final String CORREO_DUPLICADO = "CORREO_YA_REGISTRADO";
 	private static final int MAXIMO_BYTES_CONTRASENA = 72;
+	private static final String USUARIO = "USUARIO";
+	private static final String INICIO_SESION = "INICIO_SESION";
 
 	private final UsuarioRepository usuarioRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final AuthenticationManager authenticationManager;
+	private final Auditoria auditoria;
 	private final Clock reloj;
 	private final int intentosMaximos;
 	private final Duration duracionBloqueo;
 
 	public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder,
-			AuthenticationManager authenticationManager, Clock reloj,
+			AuthenticationManager authenticationManager, Auditoria auditoria, Clock reloj,
 			@Value("${marketplace.seguridad.intentos-maximos}") int intentosMaximos,
 			@Value("${marketplace.seguridad.duracion-bloqueo}") Duration duracionBloqueo) {
 		this.usuarioRepository = usuarioRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.authenticationManager = authenticationManager;
+		this.auditoria = auditoria;
 		this.reloj = reloj;
 		this.intentosMaximos = intentosMaximos;
 		this.duracionBloqueo = duracionBloqueo;
@@ -95,6 +102,8 @@ public class UsuarioService {
 			throw correoDuplicado();
 		}
 		log.info("Usuario registrado (usuario {}, rol {})", usuario.getId(), usuario.getRol());
+		auditoria.registrar(EventoAuditoria.cambio("REGISTRO_USUARIO", USUARIO, usuario.getId(), null,
+				usuario.getEstadoCuenta(), null).conActor(usuario.getId(), usuario.getRol()));
 		return UsuarioDTO.desde(usuario);
 	}
 
@@ -109,15 +118,19 @@ public class UsuarioService {
 	 * <li>5 intentos fallidos seguidos: bloqueo temporal de 15 minutos.</li>
 	 * <li>Cuenta restringida: no entra; desactivada: solo puede reactivarse (escenario 2).</li>
 	 * </ul>
-	 * El intento fallido se guarda aunque se lance la excepción, por eso {@code noRollbackFor}.
+	 * El intento fallido se guarda aunque se lance la excepción, por eso {@code noRollbackFor}; con
+	 * él queda su registro de auditoría, sin la contraseña (MA-87).
 	 */
-	@Transactional(noRollbackFor = CredencialesInvalidasException.class)
+	@Transactional(noRollbackFor = { CredencialesInvalidasException.class,
+			CuentaBloqueadaTemporalmenteException.class, CuentaRestringidaException.class,
+			CuentaDesactivadaException.class })
 	public Usuario iniciarSesion(UsuarioDTO solicitud) {
 		Instant ahora = reloj.instant();
 		String email = Usuario.normalizarEmail(solicitud.email());
 		Optional<Usuario> registrado = usuarioRepository.buscarParaLogin(email);
 
 		if (registrado.isPresent() && registrado.get().estaBloqueadoTemporalmente(ahora)) {
+			auditarInicioRechazado(registrado, "Cuenta bloqueada temporalmente");
 			throw new CuentaBloqueadaTemporalmenteException();
 		}
 
@@ -130,10 +143,13 @@ public class UsuarioService {
 				usuario.registrarIntentoFallido(ahora, intentosMaximos, duracionBloqueo);
 				log.info("Inicio de sesión fallido (usuario {})", usuario.getId());
 			});
+			auditarInicioRechazado(registrado, "Credenciales inválidas");
 			throw new CredencialesInvalidasException();
 		} catch (LockedException e) {
+			auditarInicioRechazado(registrado, "Cuenta restringida");
 			throw new CuentaRestringidaException();
 		} catch (DisabledException e) {
+			auditarInicioRechazado(registrado, "Cuenta desactivada");
 			throw new CuentaDesactivadaException();
 		}
 
@@ -141,7 +157,20 @@ public class UsuarioService {
 		usuario.registrarInicioSesionExitoso();
 		usuarioRepository.save(usuario);
 		log.info("Inicio de sesión exitoso (usuario {}, rol {})", usuario.getId(), usuario.getRol());
+		auditoria.registrar(EventoAuditoria.accion(INICIO_SESION, USUARIO, usuario.getId(), Resultado.EXITO, null)
+				.conActor(usuario.getId(), usuario.getRol()));
 		return usuario;
+	}
+
+	/**
+	 * Un intento rechazado. Si el correo no existe no se guarda cuál se intentó: solo que hubo un
+	 * intento, sin datos que permitan adivinar cuentas.
+	 */
+	private void auditarInicioRechazado(Optional<Usuario> registrado, String motivo) {
+		EventoAuditoria evento = EventoAuditoria.accion(INICIO_SESION, USUARIO,
+				registrado.map(Usuario::getId).orElse(null), Resultado.RECHAZADO, motivo);
+		auditoria.registrar(registrado.map(usuario -> evento.conActor(usuario.getId(), usuario.getRol()))
+				.orElse(evento));
 	}
 
 	// ─────────────────────────────────────────

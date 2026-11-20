@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.DatosAlojamiento;
@@ -45,6 +47,7 @@ import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 public class AlojamientoService {
 
 	private static final Logger log = LoggerFactory.getLogger(AlojamientoService.class);
+	private static final String ALOJAMIENTO = "ALOJAMIENTO";
 
 	private final AlojamientoRepository alojamientoRepository;
 	private final ServicioAdicionalRepository servicioAdicionalRepository;
@@ -54,13 +57,14 @@ public class AlojamientoService {
 	private final ServicioRepository servicioRepository;
 	private final PoliticaCancelacionRepository politicaRepository;
 	private final PublicadorEventos publicador;
+	private final Auditoria auditoria;
 	private final Clock reloj;
 
 	public AlojamientoService(AlojamientoRepository alojamientoRepository,
 			ServicioAdicionalRepository servicioAdicionalRepository, UsuarioRepository usuarioRepository,
 			CiudadRepository ciudadRepository, TipoAlojamientoRepository tipoRepository,
 			ServicioRepository servicioRepository, PoliticaCancelacionRepository politicaRepository,
-			PublicadorEventos publicador, Clock reloj) {
+			PublicadorEventos publicador, Auditoria auditoria, Clock reloj) {
 		this.alojamientoRepository = alojamientoRepository;
 		this.servicioAdicionalRepository = servicioAdicionalRepository;
 		this.usuarioRepository = usuarioRepository;
@@ -69,6 +73,7 @@ public class AlojamientoService {
 		this.servicioRepository = servicioRepository;
 		this.politicaRepository = politicaRepository;
 		this.publicador = publicador;
+		this.auditoria = auditoria;
 		this.reloj = reloj;
 	}
 
@@ -84,6 +89,8 @@ public class AlojamientoService {
 				new Alojamiento(dueno, resolverDatos(solicitud), reloj.instant()));
 		// Solo se registran ids numéricos y enums: no pueden traer saltos de línea.
 		log.info("Alojamiento registrado (alojamiento {}, anfitrión {})", alojamiento.getId(), anfitrion.getId()); // NOSONAR
+		auditoria.registrar(EventoAuditoria.cambio("CREAR_ALOJAMIENTO", ALOJAMIENTO, alojamiento.getId(), null,
+				alojamiento.getEstado(), null));
 		return AlojamientoDTO.desde(alojamiento);
 	}
 
@@ -180,7 +187,7 @@ public class AlojamientoService {
 		EstadoAlojamiento anterior = alojamiento.getEstado();
 		alojamiento.cambiarEstado(EstadoAlojamiento.ACTIVA, reloj.instant());
 		registrarCambioDeEstado(alojamiento, anterior, administrador);
-		publicador.publicar("ALOJAMIENTO_APROBADO", "ALOJAMIENTO", alojamientoId, datosDelEvento(alojamiento, null));
+		publicador.publicar("ALOJAMIENTO_APROBADO", ALOJAMIENTO, alojamientoId, datosDelEvento(alojamiento, null));
 		return AlojamientoDTO.desde(alojamiento);
 	}
 
@@ -192,7 +199,7 @@ public class AlojamientoService {
 		EstadoAlojamiento anterior = alojamiento.getEstado();
 		alojamiento.rechazar(motivo, reloj.instant());
 		registrarCambioDeEstado(alojamiento, anterior, administrador);
-		publicador.publicar("ALOJAMIENTO_RECHAZADO", "ALOJAMIENTO", alojamientoId,
+		publicador.publicar("ALOJAMIENTO_RECHAZADO", ALOJAMIENTO, alojamientoId,
 				datosDelEvento(alojamiento, alojamiento.getMotivoRechazo()));
 		return AlojamientoDTO.desde(alojamiento);
 	}
@@ -329,13 +336,23 @@ public class AlojamientoService {
 	}
 
 	/**
-	 * Deja el cambio en el log estructurado con el id de correlación. El registro en la tabla de
-	 * auditoría se agrega con MA-87.
+	 * Deja el cambio en el log estructurado y en el registro de auditoría, en la misma transacción
+	 * (MA-87). El rechazo guarda su motivo.
 	 */
 	private void registrarCambioDeEstado(Alojamiento alojamiento, EstadoAlojamiento anterior, Usuario actor) {
 		Instant ahora = reloj.instant();
 		log.info("Cambio de estado de alojamiento {}: {} -> {} (usuario {}, rol {}, {})", // NOSONAR: solo ids, enums y fecha
 				alojamiento.getId(), anterior, alojamiento.getEstado(), actor.getId(), actor.getRol(), ahora);
+		EstadoAlojamiento nuevo = alojamiento.getEstado();
+		String accion = switch (nuevo) {
+			case PENDIENTE_REVISION -> "ENVIAR_A_REVISION";
+			case ACTIVA -> anterior == EstadoAlojamiento.PAUSADA ? "REANUDAR_ALOJAMIENTO" : "APROBAR_ALOJAMIENTO";
+			case BORRADOR -> "RECHAZAR_ALOJAMIENTO";
+			case PAUSADA -> "PAUSAR_ALOJAMIENTO";
+			case BLOQUEADA -> "BLOQUEAR_ALOJAMIENTO";
+		};
+		String detalle = nuevo == EstadoAlojamiento.BORRADOR ? alojamiento.getMotivoRechazo() : null;
+		auditoria.registrar(EventoAuditoria.cambio(accion, ALOJAMIENTO, alojamiento.getId(), anterior, nuevo, detalle));
 	}
 
 	private static RecursoNoEncontradoException noEncontrado() {

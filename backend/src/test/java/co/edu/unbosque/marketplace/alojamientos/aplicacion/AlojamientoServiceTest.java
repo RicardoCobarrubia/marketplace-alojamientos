@@ -4,6 +4,7 @@ import static co.edu.unbosque.marketplace.TestDatos.AHORA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -19,6 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.notificaciones.aplicacion.PublicadorEventos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
@@ -42,6 +45,8 @@ import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 @ExtendWith(MockitoExtension.class)
 class AlojamientoServiceTest {
 
+	@Mock
+	private Auditoria auditoria;
 	@Mock
 	private AlojamientoRepository alojamientoRepository;
 	@Mock
@@ -69,7 +74,7 @@ class AlojamientoServiceTest {
 	void preparar() {
 		servicio = new AlojamientoService(alojamientoRepository, servicioAdicionalRepository, usuarioRepository,
 				ciudadRepository, tipoRepository, servicioRepository, politicaRepository,
-				mock(PublicadorEventos.class), Clock.fixed(AHORA, ZoneOffset.UTC));
+				mock(PublicadorEventos.class), auditoria, Clock.fixed(AHORA, ZoneOffset.UTC));
 		alojamiento = TestDatos.alojamiento(10L, dueno);
 	}
 
@@ -171,6 +176,8 @@ class AlojamientoServiceTest {
 
 		assertThat(rechazado.estado()).isEqualTo(EstadoAlojamiento.BORRADOR);
 		assertThat(rechazado.motivoRechazo()).isEqualTo("Faltan fotos del baño");
+		verify(auditoria).registrar(EventoAuditoria.cambio("RECHAZAR_ALOJAMIENTO", "ALOJAMIENTO", 10L,
+				EstadoAlojamiento.PENDIENTE_REVISION, EstadoAlojamiento.BORRADOR, "Faltan fotos del baño"));
 	}
 
 	// ─────────────────────────────────────────

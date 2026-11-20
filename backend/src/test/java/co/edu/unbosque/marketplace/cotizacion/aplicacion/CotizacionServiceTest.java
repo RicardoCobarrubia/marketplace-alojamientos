@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.cotizacion.aplicacion;
 import static co.edu.unbosque.marketplace.TestDatos.AHORA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
@@ -43,6 +45,8 @@ class CotizacionServiceTest {
 	private static final LocalDate HOY = LocalDate.ofInstant(AHORA, BOGOTA);
 
 	@Mock
+	private Auditoria auditoria;
+	@Mock
 	private AlojamientoRepository alojamientoRepository;
 	@Mock
 	private ConfiguracionCotizacionRepository configuracionRepository;
@@ -56,7 +60,7 @@ class CotizacionServiceTest {
 	@BeforeEach
 	void preparar() {
 		servicio = new CotizacionService(alojamientoRepository, configuracionRepository,
-				new CalculadoraCotizacion(List.of(new DescuentoEstadiaLarga())), Clock.fixed(AHORA, ZoneOffset.UTC),
+				new CalculadoraCotizacion(List.of(new DescuentoEstadiaLarga())), auditoria, Clock.fixed(AHORA, ZoneOffset.UTC),
 				BOGOTA);
 		dueno = TestDatos.usuario(1L, Rol.ANFITRION, "hash");
 		huesped = TestDatos.usuario(2L, Rol.HUESPED, "hash", "huesped@correo.com");
@@ -138,6 +142,8 @@ class CotizacionServiceTest {
 	@Test
 	void elAdministradorCambiaLaConfiguracion() {
 		hayConfiguracion();
+		when(configuracionRepository.buscarParaActualizar(ConfiguracionCotizacion.ID_UNICO))
+				.thenReturn(Optional.of(configuracion));
 		Usuario administrador = TestDatos.usuario(9L, Rol.ADMINISTRADOR, "hash", "admin@correo.com");
 
 		ConfiguracionCotizacionDTO resultado = servicio.actualizarConfiguracion(administrador,
@@ -147,6 +153,8 @@ class CotizacionServiceTest {
 		assertThat(resultado.minimoNochesDescuento()).isEqualTo(5);
 		assertThat(resultado.actualizadoEn()).isEqualTo(AHORA);
 		verify(configuracionRepository).saveAndFlush(configuracion);
+		verify(auditoria).registrar(argThat(evento ->
+				evento.accion().equals("ACTUALIZAR_CONFIGURACION_COTIZACION") && evento.detalle().contains("Ahora: tarifa 12.5 %")));
 		assertThat(servicio.obtenerConfiguracion().porcentajeDescuentoEstadiaLarga()).isEqualByComparingTo("15");
 	}
 
