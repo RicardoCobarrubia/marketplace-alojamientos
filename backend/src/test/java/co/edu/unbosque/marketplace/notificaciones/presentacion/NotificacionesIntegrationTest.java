@@ -15,8 +15,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cache.CacheManager;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -33,10 +36,19 @@ import co.edu.unbosque.marketplace.reservas.presentacion.PasarelaDePruebaConfig;
  * Notificaciones generadas por el procesador del outbox contra PostgreSQL real (MA-75, MA-76).
  * Requiere Docker en ejecución.
  */
-@Import({ TestcontainersConfiguration.class, PasarelaDePruebaConfig.class })
-@SpringBootTest
+@Import({ TestcontainersConfiguration.class, PasarelaDePruebaConfig.class, NotificacionesIntegrationTest.Buzon.class })
+@SpringBootTest(properties = "marketplace.notificaciones.correo.activo=true")
 @ActiveProfiles("test")
 class NotificacionesIntegrationTest {
+
+	@TestConfiguration
+	static class Buzon {
+		@Bean
+		@Primary
+		BuzonDePrueba buzonDePrueba() {
+			return new BuzonDePrueba();
+		}
+	}
 
 	private static final LocalDate HOY = LocalDate.now(ZoneId.of("America/Bogota"));
 
@@ -52,6 +64,8 @@ class NotificacionesIntegrationTest {
 	private PasarelaDePrueba pasarela;
 	@Autowired
 	private ProcesadorOutbox procesador;
+	@Autowired
+	private BuzonDePrueba buzon;
 
 	private ApiDePrueba api;
 	private String anfitrion;
@@ -64,6 +78,7 @@ class NotificacionesIntegrationTest {
 		jdbc.execute("TRUNCATE TABLE evento_outbox RESTART IDENTITY");
 		api = new ApiDePrueba(contexto, jdbc, passwordEncoder, cacheManager);
 		pasarela.reiniciar();
+		buzon.reiniciar();
 		anfitrion = api.registrarEIniciarSesion("anfitrion@correo.com", "ANFITRION");
 		huesped = api.registrarEIniciarSesion("huesped@correo.com", "HUESPED");
 		administrador = api.administrador();
@@ -181,6 +196,48 @@ class NotificacionesIntegrationTest {
 		assertThat(jdbc.queryForObject("SELECT estado FROM evento_outbox WHERE agregado_id = 999", String.class))
 				.isEqualTo("FALLIDO");
 		assertThat(pendientes()).isZero();
+	}
+
+	// ─────────────────────────────────────────
+	// Copia por correo
+	// ─────────────────────────────────────────
+
+	@Test
+	void cadaNotificacionSeEnviaPorCorreoUnaSolaVez() throws Exception {
+		long reserva = reservar("r-1", 10);
+		procesador.procesarPendientes();
+		buzon.reiniciar();
+		jdbc.update("UPDATE notificacion SET correo_estado = 'OMITIDO' WHERE tipo = 'ALOJAMIENTO_APROBADO'");
+
+		assertThat(procesador.enviarCorreosPendientes()).isEqualTo(2);
+		assertThat(procesador.enviarCorreosPendientes()).isZero();
+
+		assertThat(buzon.recibidos()).extracting(BuzonDePrueba.Correo::destinatario)
+				.containsExactlyInAnyOrder("huesped@correo.com", "anfitrion@correo.com");
+		assertThat(buzon.recibidos()).filteredOn(correo -> correo.destinatario().equals("huesped@correo.com"))
+				.singleElement()
+				.satisfies(correo -> {
+					assertThat(correo.asunto()).isEqualTo("Inversiones LR: Reserva confirmada");
+					assertThat(correo.cuerpo()).contains("Tu reserva #" + reserva);
+				});
+	}
+
+	@Test
+	void conElServidorDeCorreoCaidoLasNotificacionesSiguenYElCorreoSeReintenta() throws Exception {
+		buzon.caido(true);
+		reservar("r-1", 10);
+
+		procesador.procesarPendientes();
+		assertThat(procesador.enviarCorreosPendientes()).isZero();
+
+		// La notificación interna se generó igual
+		api.como(huesped, get("/api/notificaciones")).andExpect(jsonPath("$", hasSize(1)));
+		assertThat(jdbc.queryForObject("SELECT correo_intentos FROM notificacion n JOIN usuario u"
+				+ " ON u.id = n.usuario_id WHERE u.email = 'huesped@correo.com'", Integer.class)).isEqualTo(1);
+
+		buzon.caido(false);
+		assertThat(procesador.enviarCorreosPendientes()).isPositive();
+		assertThat(buzon.recibidos()).extracting(BuzonDePrueba.Correo::destinatario).contains("huesped@correo.com");
 	}
 
 	// ─────────────────────────────────────────

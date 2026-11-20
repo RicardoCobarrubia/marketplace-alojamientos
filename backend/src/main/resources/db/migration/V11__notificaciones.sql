@@ -20,3 +20,12 @@ CREATE TABLE notificacion (
     CONSTRAINT uq_notificacion_evento_usuario UNIQUE (evento_id, usuario_id)
 );
 CREATE INDEX ix_notificacion_usuario ON notificacion (usuario_id, creada_en DESC);
+
+-- Copia por correo de cada notificación: se envía después, aparte de la entrega del evento
+ALTER TABLE notificacion
+    ADD COLUMN correo_estado    VARCHAR(20)  NOT NULL DEFAULT 'OMITIDO',
+    ADD COLUMN correo_intentos  INTEGER      NOT NULL DEFAULT 0,
+    ADD COLUMN correo_enviado_en TIMESTAMPTZ,
+    ADD CONSTRAINT ck_notificacion_correo_estado
+        CHECK (correo_estado IN ('PENDIENTE', 'ENVIADO', 'FALLIDO', 'OMITIDO'));
+CREATE INDEX ix_notificacion_correo_pendiente ON notificacion (id) WHERE correo_estado = 'PENDIENTE';

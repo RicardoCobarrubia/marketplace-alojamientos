@@ -46,7 +46,7 @@ class EntregaEventosTest {
 	@BeforeEach
 	void preparar() {
 		entrega = new EntregaEventos(eventos, notificaciones, usuarios, new ReglasNotificacion(),
-				JsonMapper.builder().build(), Clock.fixed(AHORA, ZoneOffset.UTC));
+				JsonMapper.builder().build(), Clock.fixed(AHORA, ZoneOffset.UTC), true);
 	}
 
 	private static EventoOutbox evento(String tipo, String payload) {
@@ -70,6 +70,7 @@ class EntregaEventosTest {
 		verify(notificaciones).save(guardada.capture());
 		assertThat(guardada.getValue().getUsuarioId()).isEqualTo(2L);
 		assertThat(guardada.getValue().getEventoId()).isEqualTo(7L);
+		assertThat(guardada.getValue().getCorreoEstado()).isEqualTo(Notificacion.EstadoCorreo.PENDIENTE);
 		assertThat(confirmada.getEstado()).isEqualTo(EstadoEvento.ENTREGADO);
 	}
 

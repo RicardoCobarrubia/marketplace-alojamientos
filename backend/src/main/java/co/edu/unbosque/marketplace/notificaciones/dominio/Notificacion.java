@@ -4,6 +4,8 @@ import java.time.Instant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -13,6 +15,16 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "notificacion")
 public class Notificacion {
+
+	/** Estado de la copia por correo. */
+	public enum EstadoCorreo {
+		PENDIENTE,
+		ENVIADO,
+		/** Falló demasiadas veces: se deja de reintentar. */
+		FALLIDO,
+		/** El envío de correos está desactivado. */
+		OMITIDO
+	}
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,11 +51,26 @@ public class Notificacion {
 	@Column(name = "leida_en")
 	private Instant leidaEn;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "correo_estado", nullable = false, length = 20)
+	private EstadoCorreo correoEstado;
+
+	@Column(name = "correo_intentos", nullable = false)
+	private int correoIntentos;
+
+	@Column(name = "correo_enviado_en")
+	private Instant correoEnviadoEn;
+
 	protected Notificacion() {
 		// Requerido por JPA
 	}
 
-	public Notificacion(Long usuarioId, Long eventoId, String tipo, String titulo, String mensaje, Instant ahora) {
+	/**
+	 * @param conCorreo si además se envía por correo; queda pendiente hasta que se envíe
+	 */
+	public Notificacion(Long usuarioId, Long eventoId, String tipo, String titulo, String mensaje, boolean conCorreo,
+			Instant ahora) {
+		this.correoEstado = conCorreo ? EstadoCorreo.PENDIENTE : EstadoCorreo.OMITIDO;
 		this.usuarioId = usuarioId;
 		this.eventoId = eventoId;
 		this.tipo = tipo;
@@ -57,6 +84,32 @@ public class Notificacion {
 		if (leidaEn == null) {
 			leidaEn = ahora;
 		}
+	}
+
+	/** El servidor de correo aceptó la copia. */
+	public void correoEnviado(Instant ahora) {
+		this.correoEstado = EstadoCorreo.ENVIADO;
+		this.correoEnviadoEn = ahora;
+	}
+
+	/** No se pudo enviar: suma el intento y, al llegar al máximo, deja de reintentarse. */
+	public void correoFallido(int intentosMaximos) {
+		this.correoIntentos++;
+		if (correoIntentos >= intentosMaximos) {
+			this.correoEstado = EstadoCorreo.FALLIDO;
+		}
+	}
+
+	public EstadoCorreo getCorreoEstado() {
+		return correoEstado;
+	}
+
+	public int getCorreoIntentos() {
+		return correoIntentos;
+	}
+
+	public Instant getCorreoEnviadoEn() {
+		return correoEnviadoEn;
 	}
 
 	public Long getId() {

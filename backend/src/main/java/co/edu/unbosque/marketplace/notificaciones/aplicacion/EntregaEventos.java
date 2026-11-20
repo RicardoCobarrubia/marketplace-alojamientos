@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,15 +39,18 @@ public class EntregaEventos {
 	private final ReglasNotificacion reglas;
 	private final ObjectMapper json;
 	private final Clock reloj;
+	private final boolean conCorreo;
 
 	public EntregaEventos(EventoOutboxRepository eventos, NotificacionRepository notificaciones,
-			UsuarioRepository usuarios, ReglasNotificacion reglas, ObjectMapper json, Clock reloj) {
+			UsuarioRepository usuarios, ReglasNotificacion reglas, ObjectMapper json, Clock reloj,
+			@Value("${marketplace.notificaciones.correo.activo}") boolean conCorreo) {
 		this.eventos = eventos;
 		this.notificaciones = notificaciones;
 		this.usuarios = usuarios;
 		this.reglas = reglas;
 		this.json = json;
 		this.reloj = reloj;
+		this.conCorreo = conCorreo;
 	}
 
 	/**
@@ -64,7 +68,7 @@ public class EntregaEventos {
 		for (Aviso aviso : avisos) {
 			if (!notificaciones.existsByEventoIdAndUsuarioId(eventoId, aviso.usuarioId())) {
 				notificaciones.save(new Notificacion(aviso.usuarioId(), eventoId, evento.getTipo(), aviso.titulo(),
-						aviso.mensaje(), ahora));
+						aviso.mensaje(), conCorreo, ahora));
 			}
 		}
 		evento.entregar(ahora);

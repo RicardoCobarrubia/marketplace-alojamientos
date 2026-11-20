@@ -41,7 +41,7 @@ class NotificacionServiceTest {
 	@Test
 	void listaSoloLasDelUsuarioOUnaListaVacia() {
 		when(notificaciones.findByUsuarioIdOrderByCreadaEnDescIdDesc(2L))
-				.thenReturn(List.of(new Notificacion(2L, 7L, "PAGO_FALLIDO", "Pago no completado", "Mensaje", AHORA)));
+				.thenReturn(List.of(new Notificacion(2L, 7L, "PAGO_FALLIDO", "Pago no completado", "Mensaje", false, AHORA)));
 
 		assertThat(servicio.listar(huesped)).singleElement()
 				.satisfies(dto -> assertThat(dto.titulo()).isEqualTo("Pago no completado"));
@@ -50,7 +50,7 @@ class NotificacionServiceTest {
 
 	@Test
 	void marcaComoLeidaSoloUnaPropiaYConservaLaPrimeraLectura() {
-		Notificacion propia = new Notificacion(2L, 7L, "PAGO_FALLIDO", "Pago no completado", "Mensaje", AHORA);
+		Notificacion propia = new Notificacion(2L, 7L, "PAGO_FALLIDO", "Pago no completado", "Mensaje", false, AHORA);
 		when(notificaciones.findByIdAndUsuarioId(1L, 2L)).thenReturn(Optional.of(propia));
 		propia.marcarLeida(AHORA.minusSeconds(60));
 

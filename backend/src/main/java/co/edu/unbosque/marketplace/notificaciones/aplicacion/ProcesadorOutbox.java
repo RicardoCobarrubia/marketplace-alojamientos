@@ -6,6 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import co.edu.unbosque.marketplace.notificaciones.infraestructura.EventoOutboxRepository;
+import co.edu.unbosque.marketplace.notificaciones.infraestructura.NotificacionRepository;
 
 /**
  * Procesador del Transactional Outbox (ADR-007): cada pocos segundos entrega los eventos
@@ -21,10 +22,15 @@ public class ProcesadorOutbox {
 
 	private final EventoOutboxRepository eventos;
 	private final EntregaEventos entrega;
+	private final NotificacionRepository notificaciones;
+	private final EnvioCorreos correos;
 
-	public ProcesadorOutbox(EventoOutboxRepository eventos, EntregaEventos entrega) {
+	public ProcesadorOutbox(EventoOutboxRepository eventos, EntregaEventos entrega,
+			NotificacionRepository notificaciones, EnvioCorreos correos) {
 		this.eventos = eventos;
 		this.entrega = entrega;
+		this.notificaciones = notificaciones;
+		this.correos = correos;
 	}
 
 	/** @return cuántos eventos entregó */
@@ -44,5 +50,28 @@ public class ProcesadorOutbox {
 			}
 		}
 		return entregados;
+	}
+
+	/**
+	 * Envía los correos pendientes, aparte de la entrega de eventos: si el servidor de correo
+	 * está caído, las notificaciones internas se siguen generando.
+	 *
+	 * @return cuántos correos envió
+	 */
+	@Scheduled(fixedDelayString = "${marketplace.notificaciones.intervalo:PT10S}",
+			initialDelayString = "${marketplace.notificaciones.intervalo:PT10S}")
+	public int enviarCorreosPendientes() {
+		int enviados = 0;
+		for (Long notificacionId : notificaciones.idsConCorreoPendiente(LOTE)) {
+			try {
+				if (correos.enviar(notificacionId)) {
+					enviados++;
+				}
+			} catch (RuntimeException e) {
+				log.warn("No se pudo enviar el correo de la notificación {}: {}", notificacionId, e.getMessage());
+				correos.registrarFallo(notificacionId);
+			}
+		}
+		return enviados;
 	}
 }
