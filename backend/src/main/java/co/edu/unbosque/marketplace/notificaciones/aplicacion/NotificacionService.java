@@ -30,12 +30,15 @@ public class NotificacionService {
 				.map(NotificacionDTO::desde).toList();
 	}
 
-	/** Marca como leída una notificación propia; la de otro usuario no existe para él. */
+	/**
+	 * Marca como leída una notificación propia; la de otro usuario no existe para él. Si ya estaba
+	 * leída conserva la primera fecha.
+	 */
 	@Transactional
 	public NotificacionDTO marcarLeida(Usuario usuario, Long notificacionId) {
+		notificaciones.marcarLeida(notificacionId, usuario.getId(), reloj.instant());
 		Notificacion notificacion = notificaciones.findByIdAndUsuarioId(notificacionId, usuario.getId())
 				.orElseThrow(() -> new RecursoNoEncontradoException("La notificación no existe."));
-		notificacion.marcarLeida(reloj.instant());
 		return NotificacionDTO.desde(notificacion);
 	}
 }

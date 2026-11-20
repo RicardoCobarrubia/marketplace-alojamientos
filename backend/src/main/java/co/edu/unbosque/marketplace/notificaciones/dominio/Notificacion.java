@@ -2,6 +2,8 @@ package co.edu.unbosque.marketplace.notificaciones.dominio;
 
 import java.time.Instant;
 
+import org.hibernate.annotations.DynamicUpdate;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,8 +13,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Notificación interna para un usuario, generada a partir de un evento del outbox (MA-75). */
+/**
+ * Notificación interna para un usuario, generada a partir de un evento del outbox (MA-75).
+ * <p>
+ * La lectura y el envío del correo cambian columnas distintas y pueden ocurrir a la vez: con
+ * {@code @DynamicUpdate} cada uno guarda solo lo que cambió y no pisa lo del otro.
+ */
 @Entity
+@DynamicUpdate
 @Table(name = "notificacion")
 public class Notificacion {
 

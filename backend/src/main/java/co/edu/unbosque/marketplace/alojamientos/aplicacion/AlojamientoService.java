@@ -315,10 +315,6 @@ public class AlojamientoService {
 		return usuario.getRol() == Rol.ADMINISTRADOR;
 	}
 
-	/**
-	 * Deja el cambio en el log estructurado con el id de correlación. El registro en la tabla de
-	 * auditoría se agrega con MA-87.
-	 */
 	/** Lo que necesitan las notificaciones del anfitrión (MA-75, escenario 2). */
 	public static Map<String, Object> datosDelEvento(Alojamiento alojamiento, String motivo) {
 		Map<String, Object> datos = new LinkedHashMap<>();
@@ -332,6 +328,10 @@ public class AlojamientoService {
 		return datos;
 	}
 
+	/**
+	 * Deja el cambio en el log estructurado con el id de correlación. El registro en la tabla de
+	 * auditoría se agrega con MA-87.
+	 */
 	private void registrarCambioDeEstado(Alojamiento alojamiento, EstadoAlojamiento anterior, Usuario actor) {
 		Instant ahora = reloj.instant();
 		log.info("Cambio de estado de alojamiento {}: {} -> {} (usuario {}, rol {}, {})", // NOSONAR: solo ids, enums y fecha

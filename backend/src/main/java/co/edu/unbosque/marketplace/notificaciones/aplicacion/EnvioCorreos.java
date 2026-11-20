@@ -57,10 +57,14 @@ public class EnvioCorreos {
 		return true;
 	}
 
-	/** Suma el intento fallido en una transacción propia: la del envío ya se deshizo. */
+	/**
+	 * Suma el intento fallido en una transacción propia: la del envío ya se deshizo. Solo si el
+	 * correo sigue pendiente y nadie más lo tiene tomado: no cambia uno que ya se envió.
+	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void registrarFallo(Long notificacionId) {
-		notificaciones.findById(notificacionId).ifPresent(notificacion -> notificacion.correoFallido(INTENTOS_MAXIMOS));
+		notificaciones.tomarConCorreoPendiente(notificacionId)
+				.ifPresent(notificacion -> notificacion.correoFallido(INTENTOS_MAXIMOS));
 	}
 
 	private static String cuerpo(Usuario usuario, Notificacion notificacion) {

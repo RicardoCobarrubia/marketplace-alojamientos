@@ -49,12 +49,33 @@ class NotificacionServiceTest {
 	}
 
 	@Test
-	void marcaComoLeidaSoloUnaPropiaYConservaLaPrimeraLectura() {
+	void marcaComoLeidaUnaPropiaSinLeer() {
 		Notificacion propia = new Notificacion(2L, 7L, "PAGO_FALLIDO", "Pago no completado", "Mensaje", false, AHORA);
+		// La base de datos la marca con la fecha de ahora porque aún no estaba leída
+		when(notificaciones.marcarLeida(1L, 2L, AHORA)).thenAnswer(invocacion -> {
+			propia.marcarLeida(AHORA);
+			return 1;
+		});
 		when(notificaciones.findByIdAndUsuarioId(1L, 2L)).thenReturn(Optional.of(propia));
+
+		assertThat(servicio.marcarLeida(huesped, 1L).leidaEn()).isEqualTo(AHORA);
+		assertThat(propia.getLeidaEn()).isEqualTo(AHORA);
+	}
+
+	@Test
+	void unaSegundaLecturaConservaLaPrimeraFecha() {
+		Notificacion propia = new Notificacion(2L, 7L, "PAGO_FALLIDO", "Pago no completado", "Mensaje", false, AHORA);
 		propia.marcarLeida(AHORA.minusSeconds(60));
+		when(notificaciones.marcarLeida(1L, 2L, AHORA)).thenReturn(0);
+		when(notificaciones.findByIdAndUsuarioId(1L, 2L)).thenReturn(Optional.of(propia));
 
 		assertThat(servicio.marcarLeida(huesped, 1L).leidaEn()).isEqualTo(AHORA.minusSeconds(60));
+	}
+
+	@Test
+	void laDeOtroUsuarioNoExisteParaEl() {
+		when(notificaciones.findByIdAndUsuarioId(2L, 2L)).thenReturn(Optional.empty());
+
 		assertThatThrownBy(() -> servicio.marcarLeida(huesped, 2L)).isInstanceOf(RecursoNoEncontradoException.class);
 	}
 }

@@ -220,6 +220,12 @@ class NotificacionesIntegrationTest {
 					assertThat(correo.asunto()).isEqualTo("Inversiones LR: Reserva confirmada");
 					assertThat(correo.cuerpo()).contains("Tu reserva #" + reserva);
 				});
+		// Marcarla como leída no le cambia el estado del correo
+		long id = jdbc.queryForObject("SELECT n.id FROM notificacion n JOIN usuario u ON u.id = n.usuario_id"
+				+ " WHERE u.email = 'huesped@correo.com'", Long.class);
+		api.como(huesped, post("/api/notificaciones/" + id + "/lectura")).andExpect(status().isOk());
+		assertThat(jdbc.queryForObject("SELECT correo_estado FROM notificacion WHERE id = ?", String.class, id))
+				.isEqualTo("ENVIADO");
 	}
 
 	@Test

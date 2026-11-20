@@ -1,9 +1,11 @@
 package co.edu.unbosque.marketplace.notificaciones.infraestructura;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,6 +20,16 @@ public interface NotificacionRepository extends JpaRepository<Notificacion, Long
 	Optional<Notificacion> findByIdAndUsuarioId(Long id, Long usuarioId);
 
 	boolean existsByEventoIdAndUsuarioId(Long eventoId, Long usuarioId);
+
+	/**
+	 * Marca como leída una notificación propia solo si aún no lo estaba, en la base de datos: dos
+	 * lecturas a la vez conservan la primera fecha y no tocan el estado del correo.
+	 */
+	@Modifying(clearAutomatically = true)
+	@Query("""
+			update Notificacion n set n.leidaEn = :ahora
+			where n.id = :id and n.usuarioId = :usuarioId and n.leidaEn is null""")
+	int marcarLeida(@Param("id") Long id, @Param("usuarioId") Long usuarioId, @Param("ahora") Instant ahora);
 
 	/** Las notificaciones con el correo pendiente, las más antiguas primero. */
 	@Query(value = "SELECT id FROM notificacion WHERE correo_estado = 'PENDIENTE' ORDER BY id LIMIT :limite",

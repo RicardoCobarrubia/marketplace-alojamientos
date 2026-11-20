@@ -76,10 +76,14 @@ public class EntregaEventos {
 		return true;
 	}
 
-	/** Suma el intento fallido en una transacción propia: la de la entrega ya se deshizo. */
+	/**
+	 * Suma el intento fallido en una transacción propia: la de la entrega ya se deshizo. Solo si
+	 * el evento sigue pendiente y nadie más lo tiene tomado: no cambia uno que otra réplica ya
+	 * entregó.
+	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void registrarFallo(Long eventoId, String error) {
-		eventos.findById(eventoId).ifPresent(evento -> evento.registrarFallo(error, INTENTOS_MAXIMOS));
+		eventos.tomarPendiente(eventoId).ifPresent(evento -> evento.registrarFallo(error, INTENTOS_MAXIMOS));
 	}
 
 	private List<Long> administradores() {

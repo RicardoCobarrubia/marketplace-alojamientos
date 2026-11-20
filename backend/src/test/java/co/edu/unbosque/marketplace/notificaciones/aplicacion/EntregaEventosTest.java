@@ -97,11 +97,20 @@ class EntregaEventosTest {
 	@Test
 	void registrarUnFalloSumaElIntento() {
 		EventoOutbox pendiente = evento("PAGO_FALLIDO", "{}");
-		when(eventos.findById(7L)).thenReturn(Optional.of(pendiente));
+		when(eventos.tomarPendiente(7L)).thenReturn(Optional.of(pendiente));
 
 		entrega.registrarFallo(7L, "error");
 
 		assertThat(pendiente.getIntentos()).isEqualTo(1);
 		assertThat(pendiente.getUltimoError()).isEqualTo("error");
+	}
+
+	@Test
+	void unFalloNoCambiaUnEventoQueOtraReplicaYaEntrego() {
+		when(eventos.tomarPendiente(7L)).thenReturn(Optional.empty());
+
+		entrega.registrarFallo(7L, "error");
+
+		verify(eventos, never()).findById(any());
 	}
 }
