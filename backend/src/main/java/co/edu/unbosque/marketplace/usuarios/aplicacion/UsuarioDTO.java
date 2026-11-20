@@ -39,8 +39,9 @@ public record UsuarioDTO(
 		String email,
 
 		@NotBlank(groups = { Registro.class, Perfil.class }, message = "El teléfono es obligatorio.")
-		@Pattern(groups = { Registro.class, Perfil.class }, regexp = "^\\+?\\d[\\d ]{6,18}$",
-				message = "El teléfono debe tener entre 7 y 20 dígitos.")
+		/* Máximo 20 caracteres (la columna), con al menos 7 dígitos y un espacio como máximo entre ellos. */
+		@Pattern(groups = { Registro.class, Perfil.class }, regexp = "^(?=.{7,20}$)\\+?\\d(?: ?\\d){6,}$",
+				message = "El teléfono debe tener al menos 7 dígitos y máximo 20 caracteres.")
 		String telefono,
 
 		/* BCrypt solo usa los primeros 72 bytes: el servicio revisa además el tamaño en bytes. */
