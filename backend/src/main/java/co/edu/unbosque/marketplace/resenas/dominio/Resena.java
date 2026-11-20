@@ -71,7 +71,9 @@ public class Resena {
 			throw new SolicitudInvalidaException("CALIFICACION_INVALIDA", "La calificación va de 1 a 5.");
 		}
 		String texto = comentario == null ? "" : comentario.strip();
-		if (texto.length() < LARGO_MINIMO || texto.length() > LARGO_MAXIMO) {
+		// Caracteres como los cuenta PostgreSQL (char_length): un emoji es uno, no dos
+		int largo = texto.codePointCount(0, texto.length());
+		if (largo < LARGO_MINIMO || largo > LARGO_MAXIMO) {
 			throw new SolicitudInvalidaException("COMENTARIO_INVALIDO",
 					"El comentario debe tener entre 10 y 1000 caracteres.");
 		}

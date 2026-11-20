@@ -61,6 +61,8 @@ class ResenasIntegrationTest {
 	private String huesped;
 	private String administrador;
 	private long alojamientoId;
+	/** Último registro de auditoría antes de la prueba: la tabla es inmutable y los ids de reseña se reinician. */
+	private long auditoriaDesde;
 
 	@BeforeEach
 	void preparar() throws Exception {
@@ -74,6 +76,8 @@ class ResenasIntegrationTest {
 		api.como(anfitrion, post("/api/alojamientos/" + alojamientoId + "/periodos")
 				.content("{\"fechaInicio\":\"%s\",\"fechaFin\":\"%s\"}".formatted(HOY, HOY.plusDays(60))))
 				.andExpect(status().isCreated());
+		Long ultimo = jdbc.queryForObject("SELECT max(id) FROM auditoria", Long.class);
+		auditoriaDesde = ultimo == null ? 0 : ultimo;
 	}
 
 	private long reservar(String token, String clave, int desde) throws Exception {
@@ -125,10 +129,12 @@ class ResenasIntegrationTest {
 				.andExpect(jsonPath("$.cantidad").value(2))
 				.andExpect(jsonPath("$.promedio").value(4.5))
 				.andExpect(jsonPath("$.resenas[0].calificacion").value(4))
-				.andExpect(jsonPath("$.resenas[0].huespedId").doesNotExist());
-		assertThat(jdbc.queryForObject("SELECT count(*) FROM auditoria WHERE accion = 'PUBLICAR_RESENA'"
-				+ " AND entidad_id IN (SELECT id FROM resena WHERE reserva_id IN (?, ?))", Integer.class, primera,
-				segunda)).isEqualTo(2);
+				.andExpect(jsonPath("$.resenas[0].huespedId").doesNotExist())
+				.andExpect(jsonPath("$.resenas[0].reservaId").doesNotExist())
+				.andExpect(jsonPath("$.resenas[0].oculta").doesNotExist());
+		assertThat(jdbc.queryForObject("SELECT count(*) FROM auditoria WHERE id > ? AND accion = 'PUBLICAR_RESENA'"
+				+ " AND entidad_id IN (SELECT id FROM resena WHERE reserva_id IN (?, ?))", Integer.class, auditoriaDesde,
+				primera, segunda)).isEqualTo(2);
 	}
 
 	@Test
@@ -196,8 +202,8 @@ class ResenasIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.oculta").value(false));
 		detalle().andExpect(jsonPath("$.cantidad").value(1)).andExpect(jsonPath("$.promedio").value(1.0));
-		assertThat(jdbc.queryForList("SELECT accion FROM auditoria WHERE entidad = 'RESENA' AND entidad_id = ?"
-				+ " ORDER BY id", String.class, resena))
+		assertThat(jdbc.queryForList("SELECT accion FROM auditoria WHERE id > ? AND entidad = 'RESENA'"
+				+ " AND entidad_id = ? ORDER BY id", String.class, auditoriaDesde, resena))
 				.containsExactly("PUBLICAR_RESENA", "OCULTAR_RESENA", "MOSTRAR_RESENA");
 	}
 

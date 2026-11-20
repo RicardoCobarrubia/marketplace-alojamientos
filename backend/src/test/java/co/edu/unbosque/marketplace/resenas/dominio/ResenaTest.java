@@ -50,6 +50,19 @@ class ResenaTest {
 	}
 
 	@Test
+	void elLargoDelComentarioCuentaCadaEmojiComoUnCaracterIgualQuePostgresql() {
+		String emoji = "\uD83D\uDE00";
+
+		assertThatThrownBy(() -> new Resena(50L, 10L, 2L, 4, emoji.repeat(5), AHORA))
+				.hasFieldOrPropertyWithValue("codigo", "COMENTARIO_INVALIDO");
+		assertThatThrownBy(() -> new Resena(50L, 10L, 2L, 4, emoji.repeat(1001), AHORA))
+				.hasFieldOrPropertyWithValue("codigo", "COMENTARIO_INVALIDO");
+		assertThat(new Resena(50L, 10L, 2L, 4, emoji.repeat(10), AHORA).getComentario()).isEqualTo(emoji.repeat(10));
+		String mixto = "x".repeat(900) + emoji.repeat(60);
+		assertThat(new Resena(50L, 10L, 2L, 4, mixto, AHORA).getComentario()).isEqualTo(mixto);
+	}
+
+	@Test
 	void elAdministradorLaOcultaConMotivoYLaVuelveAMostrar() {
 		Resena resena = new Resena(50L, 10L, 2L, 1, "Comentario ofensivo de prueba", AHORA);
 

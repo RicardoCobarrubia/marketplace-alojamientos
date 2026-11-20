@@ -118,7 +118,7 @@ public class ResenaService {
 				: BigDecimal.valueOf(visibles.stream().mapToInt(Resena::getCalificacion).sum())
 						.divide(BigDecimal.valueOf(visibles.size()), 1, RoundingMode.HALF_UP);
 		return new ResenasAlojamientoDTO(alojamientoId, promedio, visibles.size(),
-				visibles.stream().map(ResenasAlojamientoDTO.ResenaPublica::desde).toList());
+				visibles.stream().map(ResenaDTO::publica).toList());
 	}
 
 	// ─────────────────────────────────────────

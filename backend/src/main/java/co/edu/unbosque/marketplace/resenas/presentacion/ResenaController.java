@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import co.edu.unbosque.marketplace.resenas.aplicacion.NuevaResenaDTO;
 import co.edu.unbosque.marketplace.resenas.aplicacion.ResenaDTO;
 import co.edu.unbosque.marketplace.resenas.aplicacion.ResenaService;
 import co.edu.unbosque.marketplace.resenas.aplicacion.ResenasAlojamientoDTO;
@@ -33,7 +32,7 @@ public class ResenaController {
 	@ResponseStatus(HttpStatus.CREATED)
 	@Operation(summary = "Reseñar una estadía completada, dentro de los 30 días siguientes a la salida")
 	public ResenaDTO publicar(@AuthenticationPrincipal Usuario usuario, @PathVariable Long id,
-			@Valid @RequestBody NuevaResenaDTO solicitud) {
+			@Valid @RequestBody ResenaDTO solicitud) {
 		return resenas.publicar(usuario, id, solicitud.calificacion(), solicitud.comentario());
 	}
 
