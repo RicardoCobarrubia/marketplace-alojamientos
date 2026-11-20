@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.alojamientos.aplicacion;
 import static co.edu.unbosque.marketplace.TestDatos.AHORA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import co.edu.unbosque.marketplace.TestDatos;
+import co.edu.unbosque.marketplace.notificaciones.aplicacion.PublicadorEventos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.DatosAlojamiento;
@@ -67,7 +69,7 @@ class AlojamientoServiceTest {
 	void preparar() {
 		servicio = new AlojamientoService(alojamientoRepository, servicioAdicionalRepository, usuarioRepository,
 				ciudadRepository, tipoRepository, servicioRepository, politicaRepository,
-				Clock.fixed(AHORA, ZoneOffset.UTC));
+				mock(PublicadorEventos.class), Clock.fixed(AHORA, ZoneOffset.UTC));
 		alojamiento = TestDatos.alojamiento(10L, dueno);
 	}
 

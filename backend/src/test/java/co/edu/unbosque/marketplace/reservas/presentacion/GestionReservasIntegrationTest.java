@@ -112,7 +112,7 @@ class GestionReservasIntegrationTest {
 	}
 
 	private String ultimoEvento(long reservaId) {
-		return jdbc.queryForObject("SELECT tipo FROM evento_outbox WHERE agregado_id = ? ORDER BY id DESC LIMIT 1",
+		return jdbc.queryForObject("SELECT tipo FROM evento_outbox WHERE agregado = 'RESERVA' AND agregado_id = ? ORDER BY id DESC LIMIT 1",
 				String.class, reservaId);
 	}
 
@@ -183,7 +183,7 @@ class GestionReservasIntegrationTest {
 		assertThat(jdbc.queryForObject("SELECT cancelada_por = huesped_id FROM reserva WHERE id = ?", Boolean.class,
 				id)).isTrue();
 		assertThat(pasarela.montoDevuelto(referencia(id))).isEqualByComparingTo("693000");
-		assertThat(jdbc.queryForList("SELECT tipo FROM evento_outbox WHERE agregado_id = ? ORDER BY id", String.class,
+		assertThat(jdbc.queryForList("SELECT tipo FROM evento_outbox WHERE agregado = 'RESERVA' AND agregado_id = ? ORDER BY id", String.class,
 				id)).containsExactly("RESERVA_CONFIRMADA", "RESERVA_CANCELADA", "DEVOLUCION_SOLICITADA");
 		// Otro huésped puede reservar las mismas fechas
 		String otro = api.registrarEIniciarSesion("otro@correo.com", "HUESPED");

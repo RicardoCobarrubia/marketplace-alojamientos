@@ -16,7 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Guarda un evento en el outbox (ADR-007). Exige una transacción abierta: el evento se confirma
  * o se revierte junto con el cambio que lo origina. La entrega a las notificaciones internas la
- * hace el procesador del outbox, en su propia historia.
+ * hace después {@link ProcesadorOutbox}.
  */
 @Service
 public class PublicadorEventos {

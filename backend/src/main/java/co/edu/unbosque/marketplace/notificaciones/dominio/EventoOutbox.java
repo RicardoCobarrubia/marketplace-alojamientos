@@ -25,8 +25,12 @@ public class EventoOutbox {
 
 	public enum EstadoEvento {
 		PENDIENTE,
-		ENTREGADO
+		ENTREGADO,
+		/** Falló demasiadas veces: se deja de reintentar para no frenar a los demás. */
+		FALLIDO
 	}
+
+	private static final int MAXIMO_ERROR = 500;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,6 +65,9 @@ public class EventoOutbox {
 	@Column(name = "entregado_en")
 	private Instant entregadoEn;
 
+	@Column(name = "ultimo_error", length = MAXIMO_ERROR)
+	private String ultimoError;
+
 	protected EventoOutbox() {
 		// Requerido por JPA
 	}
@@ -74,6 +81,25 @@ public class EventoOutbox {
 		this.correlationId = correlationId;
 		this.estado = EstadoEvento.PENDIENTE;
 		this.creadoEn = ahora;
+	}
+
+	/** Ya se generaron sus notificaciones. */
+	public void entregar(Instant ahora) {
+		this.estado = EstadoEvento.ENTREGADO;
+		this.entregadoEn = ahora;
+	}
+
+	/** No se pudo entregar: suma el intento y, al llegar al máximo, deja de reintentarse. */
+	public void registrarFallo(String error, int intentosMaximos) {
+		this.intentos++;
+		this.ultimoError = error == null || error.length() <= MAXIMO_ERROR ? error : error.substring(0, MAXIMO_ERROR);
+		if (intentos >= intentosMaximos) {
+			this.estado = EstadoEvento.FALLIDO;
+		}
+	}
+
+	public String getUltimoError() {
+		return ultimoError;
 	}
 
 	public Long getId() {
