@@ -107,7 +107,7 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 	}
 
 	/**
-	 * Todo acceso denegado queda auditado con quién lo intentó y sobre qué recurso (MA-80 y MA-81,
+	 * Cada acceso denegado queda auditado con quién lo intentó y sobre qué recurso (MA-80 y MA-81,
 	 * escenario 3). Si el registro falla, la respuesta 403 se da igual.
 	 */
 	private void auditarAccesoDenegado() {

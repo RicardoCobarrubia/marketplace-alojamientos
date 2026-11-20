@@ -23,7 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /**
- * Moderación (MA-80 a MA-82). Todo {@code /api/admin/**} exige el rol ADMINISTRADOR
+ * Moderación (MA-80 a MA-82). Las rutas {@code /api/admin/**} exigen el rol ADMINISTRADOR
  * (SecurityConfig); cualquier otro rol recibe 403 y el intento queda auditado.
  */
 @RestController

@@ -163,7 +163,7 @@ public class ModeracionService {
 	}
 
 	private Usuario usuario(Long usuarioId) {
-		return usuarioRepository.findById(usuarioId)
+		return usuarioRepository.buscarParaActualizar(usuarioId)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El usuario no existe."));
 	}
 }

@@ -16,7 +16,7 @@ CREATE TABLE auditoria (
     estado_anterior  VARCHAR(30),
     estado_nuevo     VARCHAR(30),
     resultado        VARCHAR(20)   NOT NULL,
-    detalle          VARCHAR(500),
+    detalle          VARCHAR(1000),
     correlation_id   VARCHAR(100),
     CONSTRAINT ck_auditoria_resultado CHECK (resultado IN ('EXITO', 'RECHAZADO'))
 );
@@ -32,3 +32,8 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER tr_auditoria_inmutable
     BEFORE UPDATE OR DELETE ON auditoria
     FOR EACH ROW EXECUTE FUNCTION auditoria_inmutable();
+
+-- TRUNCATE no dispara los triggers por fila: necesita uno propio por sentencia
+CREATE TRIGGER tr_auditoria_sin_truncate
+    BEFORE TRUNCATE ON auditoria
+    FOR EACH STATEMENT EXECUTE FUNCTION auditoria_inmutable();

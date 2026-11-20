@@ -20,7 +20,7 @@ import jakarta.persistence.Table;
 @Table(name = "auditoria")
 public class RegistroAuditoria {
 
-	private static final int MAXIMO_DETALLE = 500;
+	private static final int MAXIMO_DETALLE = 1000;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

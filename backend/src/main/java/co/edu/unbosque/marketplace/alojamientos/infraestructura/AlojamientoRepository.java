@@ -24,6 +24,13 @@ public interface AlojamientoRepository extends JpaRepository<Alojamiento, Long> 
 	List<Alojamiento> findAllByOrderByCreadoEnDesc();
 
 	/**
+	 * El estado actual del alojamiento, leído de la base de datos con bloqueo compartido: espera
+	 * a que termine un bloqueo en curso (MA-80) y le impide empezar hasta terminar la transacción.
+	 */
+	@Query(value = "SELECT estado FROM alojamiento WHERE id = :id FOR SHARE", nativeQuery = true)
+	String estadoConBloqueoCompartido(@Param("id") Long id);
+
+	/**
 	 * Bloquea la fila del alojamiento hasta terminar la transacción. Lo usan los cambios de
 	 * disponibilidad y lo usará la creación de reservas (MA-66): así una reserva no puede entrar
 	 * mientras se reduce o elimina el periodo que la contiene.

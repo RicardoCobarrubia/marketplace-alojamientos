@@ -112,7 +112,7 @@ class ModeracionServiceTest {
 
 	@Test
 	void restringirPausaSusAlojamientosPoneEnRevisionYOlvidaSuSesionAlConfirmar() {
-		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(anfitrion));
+		when(usuarioRepository.buscarParaActualizar(1L)).thenReturn(Optional.of(anfitrion));
 		when(alojamientoRepository.findByAnfitrionIdAndEstado(1L, EstadoAlojamiento.ACTIVA))
 				.thenReturn(List.of(alojamiento));
 		when(revisionReservas.ponerEnRevisionDelUsuario(1L, "Usuario restringido: Fraude")).thenReturn(3);
@@ -134,7 +134,7 @@ class ModeracionServiceTest {
 
 	@Test
 	void noSePuedeRestringirAUnAdministrador() {
-		when(usuarioRepository.findById(3L)).thenReturn(Optional.of(TestDatos.usuario(3L, Rol.ADMINISTRADOR, "hash")));
+		when(usuarioRepository.buscarParaActualizar(3L)).thenReturn(Optional.of(TestDatos.usuario(3L, Rol.ADMINISTRADOR, "hash")));
 
 		assertThatThrownBy(() -> servicio.restringirUsuario(3L, "Motivo"))
 				.isInstanceOf(ReglaNegocioException.class)
@@ -145,7 +145,7 @@ class ModeracionServiceTest {
 	@Test
 	void levantarLaRestriccionReactivaLaCuenta() {
 		anfitrion.restringir("Fraude");
-		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(anfitrion));
+		when(usuarioRepository.buscarParaActualizar(1L)).thenReturn(Optional.of(anfitrion));
 		when(cacheManager.getCache(CacheConfig.VERSIONES_SESION)).thenReturn(null);
 
 		assertThat(servicio.levantarRestriccion(1L).estado()).isEqualTo("ACTIVA");
@@ -156,7 +156,7 @@ class ModeracionServiceTest {
 
 	@Test
 	void unUsuarioQueNoExisteResponde404() {
-		when(usuarioRepository.findById(99L)).thenReturn(Optional.empty());
+		when(usuarioRepository.buscarParaActualizar(99L)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> servicio.levantarRestriccion(99L)).isInstanceOf(RecursoNoEncontradoException.class);
 	}

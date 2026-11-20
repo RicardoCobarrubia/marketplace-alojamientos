@@ -123,5 +123,13 @@ class AlojamientoTest {
 	@Test
 	void soloSeDesbloqueaUnAlojamientoBloqueado() {
 		assertThatThrownBy(() -> alojamiento.desbloquear(AHORA)).isInstanceOf(ReglaNegocioException.class);
+		alojamiento.enviarARevision(AHORA);
+		alojamiento.cambiarEstado(EstadoAlojamiento.ACTIVA, AHORA);
+
+		// ACTIVA → PAUSADA es una transición válida, pero no es un desbloqueo
+		assertThatThrownBy(() -> alojamiento.desbloquear(AHORA))
+				.isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "NO_BLOQUEADO");
+		assertThat(alojamiento.getEstado()).isEqualTo(EstadoAlojamiento.ACTIVA);
 	}
 }

@@ -66,13 +66,13 @@ class AuditoriaJpaTest {
 
 	@Test
 	void sinUsuarioAutenticadoNoHayActorYElDetalleLargoSeRecorta() {
-		auditoria.registrar(EventoAuditoria.accesoDenegado("x".repeat(600)));
+		auditoria.registrar(EventoAuditoria.accesoDenegado("x".repeat(1200)));
 
 		RegistroAuditoria registro = guardado();
 		assertThat(registro.getActorId()).isNull();
 		assertThat(registro.getActorRol()).isNull();
 		assertThat(registro.getResultado()).isEqualTo(EventoAuditoria.Resultado.RECHAZADO);
 		assertThat(registro.getAccion()).isEqualTo("ACCESO_DENEGADO");
-		assertThat(registro.getDetalle()).hasSize(500);
+		assertThat(registro.getDetalle()).hasSize(1000);
 	}
 }

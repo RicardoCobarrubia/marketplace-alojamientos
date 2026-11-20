@@ -308,6 +308,9 @@ public class Alojamiento {
 
 	/** Al desbloquearlo queda PAUSADA: el anfitrión decide cuándo reanudarlo (MA-80, escenario 2). */
 	public void desbloquear(Instant ahora) {
+		if (estado != EstadoAlojamiento.BLOQUEADA) {
+			throw new ReglaNegocioException("NO_BLOQUEADO", "El alojamiento no está bloqueado.");
+		}
 		cambiarEstado(EstadoAlojamiento.PAUSADA, ahora);
 		this.motivoBloqueo = null;
 	}

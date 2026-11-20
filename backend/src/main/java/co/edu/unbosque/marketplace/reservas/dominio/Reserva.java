@@ -367,6 +367,9 @@ public class Reserva {
 
 	/** El administrador decide mantenerla: EN_REVISION → CONFIRMADA (MA-82). */
 	public void mantener(Instant ahora) {
+		if (estado != EstadoReserva.EN_REVISION) {
+			throw new ReglaNegocioException("NO_EN_REVISION", "Solo se puede mantener una reserva en revisión.");
+		}
 		cambiarEstado(EstadoReserva.CONFIRMADA, ahora);
 	}
 

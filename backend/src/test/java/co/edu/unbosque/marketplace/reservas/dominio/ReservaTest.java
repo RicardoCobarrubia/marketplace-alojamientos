@@ -338,8 +338,13 @@ class ReservaTest {
 
 	@Test
 	void soloUnaReservaEnRevisionSePuedeMantener() {
-		reserva.confirmar("pi_1", AHORA);
+		// PENDIENTE_PAGO → CONFIRMADA es la transición del pago, no una decisión de moderación
+		assertThatThrownBy(() -> reserva.mantener(AHORA))
+				.isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "NO_EN_REVISION");
+		assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.PENDIENTE_PAGO);
 
+		reserva.confirmar("pi_1", AHORA);
 		assertThatThrownBy(() -> reserva.mantener(AHORA)).isInstanceOf(ReglaNegocioException.class);
 	}
 }
