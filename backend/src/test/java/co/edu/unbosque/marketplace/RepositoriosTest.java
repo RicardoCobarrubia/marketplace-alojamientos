@@ -36,13 +36,27 @@ class RepositoriosTest {
 		for (Class<?> repositorio : repositorios) {
 			Class<?> entidad = entidadDe(repositorio);
 			for (Method metodo : repositorio.getDeclaredMethods()) {
-				if (!metodo.isAnnotationPresent(Query.class) && !metodo.isDefault()) {
+				if (!metodo.isAnnotationPresent(Query.class) && !metodo.isDefault()
+						&& !redefineUnoDeSpringData(repositorio, metodo)) {
 					assertThatCode(() -> new PartTree(metodo.getName(), entidad))
 							.as(repositorio.getSimpleName() + "." + metodo.getName())
 							.doesNotThrowAnyException();
 				}
 			}
 		}
+	}
+
+	/** Un método de Spring Data redeclarado, por ejemplo para agregarle un {@code @EntityGraph}. */
+	private static boolean redefineUnoDeSpringData(Class<?> repositorio, Method metodo) {
+		for (Class<?> padre : repositorio.getInterfaces()) {
+			try {
+				padre.getMethod(metodo.getName(), metodo.getParameterTypes());
+				return true;
+			} catch (NoSuchMethodException e) {
+				// No lo declara este padre: se revisa el siguiente
+			}
+		}
+		return false;
 	}
 
 	private static Class<?> entidadDe(Class<?> repositorio) {

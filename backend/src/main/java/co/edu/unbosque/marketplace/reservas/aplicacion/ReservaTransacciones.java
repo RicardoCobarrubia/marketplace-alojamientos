@@ -29,7 +29,6 @@ import co.edu.unbosque.marketplace.disponibilidad.dominio.PeriodoReservado;
 import co.edu.unbosque.marketplace.disponibilidad.dominio.RangoFechas;
 import co.edu.unbosque.marketplace.disponibilidad.infraestructura.PeriodoDisponibleRepository;
 import co.edu.unbosque.marketplace.disponibilidad.infraestructura.PeriodoReservadoRepository;
-import co.edu.unbosque.marketplace.notificaciones.aplicacion.PublicadorEventos;
 import co.edu.unbosque.marketplace.reservas.dominio.ClaveIdempotencia;
 import co.edu.unbosque.marketplace.reservas.dominio.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.dominio.Reserva;
@@ -54,7 +53,6 @@ import tools.jackson.databind.ObjectMapper;
 public class ReservaTransacciones {
 
 	private static final Logger log = LoggerFactory.getLogger(ReservaTransacciones.class);
-	private static final String AGREGADO = "RESERVA";
 	private static final String NO_EXISTE = "La reserva no existe.";
 
 	private final ReservaRepository reservaRepository;
@@ -64,7 +62,7 @@ public class ReservaTransacciones {
 	private final PeriodoDisponibleRepository periodoDisponibleRepository;
 	private final PeriodoReservadoRepository periodoReservadoRepository;
 	private final CotizacionService cotizacionService;
-	private final PublicadorEventos publicador;
+	private final EventosReserva eventos;
 	private final ObjectMapper json;
 	private final Clock reloj;
 	private final Duration retencion;
@@ -73,7 +71,7 @@ public class ReservaTransacciones {
 			AlojamientoRepository alojamientoRepository, UsuarioRepository usuarioRepository,
 			PeriodoDisponibleRepository periodoDisponibleRepository,
 			PeriodoReservadoRepository periodoReservadoRepository, CotizacionService cotizacionService,
-			PublicadorEventos publicador, ObjectMapper json, Clock reloj,
+			EventosReserva eventos, ObjectMapper json, Clock reloj,
 			@Value("${marketplace.reservas.retencion:PT10M}") Duration retencion) {
 		this.reservaRepository = reservaRepository;
 		this.claveRepository = claveRepository;
@@ -82,7 +80,7 @@ public class ReservaTransacciones {
 		this.periodoDisponibleRepository = periodoDisponibleRepository;
 		this.periodoReservadoRepository = periodoReservadoRepository;
 		this.cotizacionService = cotizacionService;
-		this.publicador = publicador;
+		this.eventos = eventos;
 		this.json = json;
 		this.reloj = reloj;
 		this.retencion = retencion;
@@ -156,8 +154,9 @@ public class ReservaTransacciones {
 	@Transactional
 	public Desenlace confirmar(Long reservaId, String referenciaPago) {
 		Reserva reserva = bloquear(reservaId);
-		if (reserva.getEstado() == EstadoReserva.CONFIRMADA && referenciaPago.equals(reserva.getReferenciaPago())) {
-			// Otro reintento ya la confirmó con este mismo cobro: no hay nada que devolver
+		if (reserva.getEstado().fueConfirmada() && referenciaPago.equals(reserva.getReferenciaPago())) {
+			// Otro reintento ya la confirmó con este mismo cobro (y quizá ya se completó o canceló):
+			// ese cobro pagó la reserva, así que no se devuelve aquí
 			return new Desenlace(respuestaGuardada(reserva), false);
 		}
 		if (reserva.getEstado() != EstadoReserva.PENDIENTE_PAGO) {
@@ -178,7 +177,7 @@ public class ReservaTransacciones {
 		Instant ahora = reloj.instant();
 		reserva.confirmar(referenciaPago, ahora);
 		fechas.bloquearDefinitivamente();
-		publicar("RESERVA_CONFIRMADA", reserva);
+		eventos.publicar("RESERVA_CONFIRMADA", reserva);
 		RespuestaReserva respuesta = new RespuestaReserva(HttpStatus.CREATED.value(),
 				json.writeValueAsString(ReservaDTO.desde(reserva)));
 		terminarClave(reservaId, respuesta, ahora);
@@ -215,7 +214,7 @@ public class ReservaTransacciones {
 		if (fechas.getLiberadoEn() == null) {
 			fechas.liberar(ahora);
 		}
-		publicar("PAGO_FALLIDO", reserva);
+		eventos.publicar("PAGO_FALLIDO", reserva);
 		RespuestaReserva respuesta = new RespuestaReserva(estadoHttp.value(),
 				problema(estadoHttp, codigo, detalle, reserva.getId()));
 		terminarClave(reserva.getId(), respuesta, ahora);
@@ -311,19 +310,6 @@ public class ReservaTransacciones {
 				.map(clave -> new RespuestaReserva(clave.getCodigoHttp(), clave.getRespuesta()))
 				.orElseGet(() -> new RespuestaReserva(HttpStatus.OK.value(),
 						json.writeValueAsString(ReservaDTO.desde(reserva))));
-	}
-
-	private void publicar(String tipo, Reserva reserva) {
-		Map<String, Object> datos = new LinkedHashMap<>();
-		datos.put("reservaId", reserva.getId());
-		datos.put("estado", reserva.getEstado());
-		datos.put("alojamientoId", reserva.getAlojamiento().getId());
-		datos.put("huespedId", reserva.getHuesped().getId());
-		datos.put("anfitrionId", reserva.getAlojamiento().getAnfitrion().getId());
-		datos.put("llegada", reserva.getFechaLlegada().toString());
-		datos.put("salida", reserva.getFechaSalida().toString());
-		datos.put("total", reserva.getTotal());
-		publicador.publicar(tipo, AGREGADO, reserva.getId(), datos);
 	}
 
 	/** Mismo formato que ManejadorGlobalExcepciones (Problem Details), con el número de reserva. */

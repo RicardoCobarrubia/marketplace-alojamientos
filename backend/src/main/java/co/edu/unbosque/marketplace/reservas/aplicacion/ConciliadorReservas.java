@@ -14,6 +14,8 @@ import co.edu.unbosque.marketplace.pagos.dominio.PasarelaNoDisponibleException;
  * alcanzó a cobrar, se devuelve el pago (MA-60, escenario 2).</li>
  * <li>Pagos en duda (la pasarela no respondió ni a la consulta): se consultan otra vez y, si hubo
  * cobro, se devuelve (MA-68, escenario 3).</li>
+ * <li>Reservas confirmadas cuya fecha de salida ya llegó: pasan a COMPLETADA (MA-71, escenario
+ * 3).</li>
  * </ul>
  * Puede correr en varias réplicas a la vez: cada reserva se bloquea al cambiarla y las
  * operaciones con la pasarela usan la misma clave de idempotencia.
@@ -25,10 +27,13 @@ public class ConciliadorReservas {
 
 	private final ReservaTransacciones transacciones;
 	private final ReservaService reservaService;
+	private final GestionReservasService gestion;
 
-	public ConciliadorReservas(ReservaTransacciones transacciones, ReservaService reservaService) {
+	public ConciliadorReservas(ReservaTransacciones transacciones, ReservaService reservaService,
+			GestionReservasService gestion) {
 		this.transacciones = transacciones;
 		this.reservaService = reservaService;
+		this.gestion = gestion;
 	}
 
 	@Scheduled(fixedDelayString = "${marketplace.reservas.conciliacion:PT30S}",
@@ -65,5 +70,20 @@ public class ConciliadorReservas {
 			}
 		}
 		return verificadas;
+	}
+
+	@Scheduled(fixedDelayString = "${marketplace.reservas.completar:PT1H}", initialDelayString = "PT1M")
+	public int completarTerminadas() {
+		int completadas = 0;
+		for (Long reservaId : gestion.porCompletar()) {
+			try {
+				if (gestion.completar(reservaId)) {
+					completadas++;
+				}
+			} catch (RuntimeException e) {
+				log.error("No se pudo completar la reserva {}", reservaId, e);
+			}
+		}
+		return completadas;
 	}
 }

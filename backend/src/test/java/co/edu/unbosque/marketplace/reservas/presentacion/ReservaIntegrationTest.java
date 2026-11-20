@@ -367,7 +367,7 @@ class ReservaIntegrationTest {
 	void unaRetencionVencidaSeLiberaYLasFechasQuedanParaOtro() throws Exception {
 		Usuario primero = usuarioRepository.findByEmail("huesped@correo.com").orElseThrow();
 		ReservaDTO solicitud = new ReservaDTO(null, alojamientoId, LLEGADA, SALIDA, 2, null, null, null, null, null,
-				null, null, null, null, null, null, null, null, null);
+				null, null, null, null, null, null, null, null, null, null, null);
 		// Una reserva que quedó en PENDIENTE_PAGO hace 11 minutos (el proceso cayó antes de pagar)
 		long pendiente = transacciones.iniciar(primero, "abandonada", "huella", solicitud).getId();
 		jdbc.update("UPDATE reserva SET creado_en = now() - interval '11 minutes' WHERE id = ?", pendiente);

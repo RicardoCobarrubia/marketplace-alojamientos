@@ -79,7 +79,13 @@ public record ReservaDTO(
 		String motivoFallo,
 
 		@JsonProperty(access = Access.READ_ONLY)
-		Instant creadoEn) {
+		Instant creadoEn,
+
+		@JsonProperty(access = Access.READ_ONLY)
+		String motivoCancelacion,
+
+		@JsonProperty(access = Access.READ_ONLY)
+		Instant canceladaEn) {
 
 	/** Servicio adicional contratado con el precio que tenía al reservar. */
 	public record ServicioReservado(Long servicioId, String nombre, Modalidad modalidad, BigDecimal costoUnitario,
@@ -98,6 +104,7 @@ public record ReservaDTO(
 				Set.copyOf(servicios.stream().map(ServicioReservado::servicioId).toList()), reserva.getEstado(),
 				reserva.getHuesped().getId(), reserva.getNoches(), reserva.getPrecioNoche(), reserva.getSubtotal(),
 				reserva.getTotalDescuentos(), reserva.getLimpieza(), servicios, reserva.getTotalServicios(),
-				reserva.getTarifaServicio(), reserva.getTotal(), reserva.getMotivoFallo(), reserva.getCreadoEn());
+				reserva.getTarifaServicio(), reserva.getTotal(), reserva.getMotivoFallo(), reserva.getCreadoEn(),
+				reserva.getMotivoCancelacion(), reserva.getCanceladaEn());
 	}
 }

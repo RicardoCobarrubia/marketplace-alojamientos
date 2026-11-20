@@ -24,6 +24,8 @@ class ConciliadorReservasTest {
 	private ReservaTransacciones transacciones;
 	@Mock
 	private ReservaService reservaService;
+	@Mock
+	private GestionReservasService gestion;
 
 	@Test
 	void venceLasRetencionesYVerificaLosPagosEnDuda() {
@@ -34,7 +36,7 @@ class ConciliadorReservasTest {
 		when(transacciones.buscar(1L)).thenReturn(Optional.of(vencida));
 		when(transacciones.buscar(2L)).thenReturn(Optional.of(enDuda));
 
-		new ConciliadorReservas(transacciones, reservaService).conciliar();
+		new ConciliadorReservas(transacciones, reservaService, gestion).conciliar();
 
 		verify(reservaService).vencer(vencida);
 		verify(reservaService).verificarPago(enDuda);
@@ -52,10 +54,21 @@ class ConciliadorReservasTest {
 		Reserva enDuda = mock(Reserva.class);
 		when(transacciones.buscar(3L)).thenReturn(Optional.of(enDuda));
 		doThrow(new PasarelaNoDisponibleException("caída")).when(reservaService).verificarPago(enDuda);
-		ConciliadorReservas conciliador = new ConciliadorReservas(transacciones, reservaService);
+		ConciliadorReservas conciliador = new ConciliadorReservas(transacciones, reservaService, gestion);
 
 		assertThat(conciliador.vencerRetenciones()).isEqualTo(1);
 		assertThat(conciliador.verificarPagosEnDuda()).isZero();
 		verify(reservaService).vencer(segunda);
+	}
+
+	@Test
+	void completaLasReservasTerminadasAunqueUnaFalle() {
+		when(gestion.porCompletar()).thenReturn(List.of(1L, 2L, 3L));
+		when(gestion.completar(1L)).thenReturn(true);
+		when(gestion.completar(2L)).thenThrow(new IllegalStateException("falla"));
+		when(gestion.completar(3L)).thenReturn(false);
+
+		assertThat(new ConciliadorReservas(transacciones, reservaService, gestion).completarTerminadas()).isEqualTo(1);
+		verify(gestion).completar(3L);
 	}
 }
