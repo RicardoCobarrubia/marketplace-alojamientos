@@ -18,6 +18,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
 	boolean existsByEmail(String email);
 
+	/** Por ejemplo, los administradores activos que reciben las reservas por revisar (MA-75). */
+	List<Usuario> findByRolAndEstadoCuenta(Usuario.Rol rol, Usuario.EstadoCuenta estadoCuenta);
+
 	/**
 	 * Para el inicio de sesión: bloquea la fila hasta terminar la transacción. Así dos intentos
 	 * simultáneos no leen el mismo contador de intentos fallidos y el bloqueo no se retrasa.

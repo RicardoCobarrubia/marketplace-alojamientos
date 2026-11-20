@@ -33,6 +33,7 @@ import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.configuracion.CacheConfig;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
+import co.edu.unbosque.marketplace.notificaciones.aplicacion.PublicadorEventos;
 import co.edu.unbosque.marketplace.reservas.aplicacion.RevisionReservasService;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
@@ -54,6 +55,8 @@ class ModeracionServiceTest {
 	private CacheManager cacheManager;
 	@Mock
 	private Cache cache;
+	@Mock
+	private PublicadorEventos publicador;
 
 	private ModeracionService servicio;
 	private Usuario anfitrion;
@@ -62,7 +65,7 @@ class ModeracionServiceTest {
 	@BeforeEach
 	void preparar() {
 		servicio = new ModeracionService(alojamientoRepository, usuarioRepository, revisionReservas, auditoria,
-				cacheManager, Clock.fixed(AHORA, ZoneOffset.UTC));
+				cacheManager, publicador, Clock.fixed(AHORA, ZoneOffset.UTC));
 		anfitrion = TestDatos.usuario(1L, Rol.ANFITRION, "hash", "anfitrion@correo.com");
 		alojamiento = TestDatos.alojamiento(10L, anfitrion);
 		alojamiento.enviarARevision(AHORA);

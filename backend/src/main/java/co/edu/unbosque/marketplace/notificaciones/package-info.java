@@ -1,9 +1,10 @@
 /**
- * Módulo de notificaciones internas: el puerto de envío de correo con su adaptador SMTP y el
- * procesador del Transactional Outbox (ADR-007).
+ * Módulo de notificaciones internas (MA-75, MA-76) y procesador del Transactional Outbox
+ * (ADR-007).
  * <p>
- * Por ahora solo se guardan los eventos: {@code PublicadorEventos} los escribe en la misma
- * transacción que el cambio que los origina. La entrega y las notificaciones internas van en su
- * propia historia.
+ * {@code PublicadorEventos} guarda cada evento en la misma transacción que el cambio que lo
+ * origina. {@code ProcesadorOutbox} los entrega después, por separado: genera las notificaciones
+ * según {@code ReglasNotificacion} y marca el evento ENTREGADO. Así un fallo de las
+ * notificaciones nunca impide reservar ni cancelar.
  */
 package co.edu.unbosque.marketplace.notificaciones;

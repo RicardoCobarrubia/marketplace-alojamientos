@@ -3,7 +3,9 @@ package co.edu.unbosque.marketplace.alojamientos.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -25,6 +27,7 @@ import co.edu.unbosque.marketplace.alojamientos.infraestructura.TipoAlojamientoR
 import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.InformacionIncompletaException;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
+import co.edu.unbosque.marketplace.notificaciones.aplicacion.PublicadorEventos;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
@@ -50,13 +53,14 @@ public class AlojamientoService {
 	private final TipoAlojamientoRepository tipoRepository;
 	private final ServicioRepository servicioRepository;
 	private final PoliticaCancelacionRepository politicaRepository;
+	private final PublicadorEventos publicador;
 	private final Clock reloj;
 
 	public AlojamientoService(AlojamientoRepository alojamientoRepository,
 			ServicioAdicionalRepository servicioAdicionalRepository, UsuarioRepository usuarioRepository,
 			CiudadRepository ciudadRepository, TipoAlojamientoRepository tipoRepository,
 			ServicioRepository servicioRepository, PoliticaCancelacionRepository politicaRepository,
-			Clock reloj) {
+			PublicadorEventos publicador, Clock reloj) {
 		this.alojamientoRepository = alojamientoRepository;
 		this.servicioAdicionalRepository = servicioAdicionalRepository;
 		this.usuarioRepository = usuarioRepository;
@@ -64,6 +68,7 @@ public class AlojamientoService {
 		this.tipoRepository = tipoRepository;
 		this.servicioRepository = servicioRepository;
 		this.politicaRepository = politicaRepository;
+		this.publicador = publicador;
 		this.reloj = reloj;
 	}
 
@@ -175,6 +180,7 @@ public class AlojamientoService {
 		EstadoAlojamiento anterior = alojamiento.getEstado();
 		alojamiento.cambiarEstado(EstadoAlojamiento.ACTIVA, reloj.instant());
 		registrarCambioDeEstado(alojamiento, anterior, administrador);
+		publicador.publicar("ALOJAMIENTO_APROBADO", "ALOJAMIENTO", alojamientoId, datosDelEvento(alojamiento, null));
 		return AlojamientoDTO.desde(alojamiento);
 	}
 
@@ -186,6 +192,8 @@ public class AlojamientoService {
 		EstadoAlojamiento anterior = alojamiento.getEstado();
 		alojamiento.rechazar(motivo, reloj.instant());
 		registrarCambioDeEstado(alojamiento, anterior, administrador);
+		publicador.publicar("ALOJAMIENTO_RECHAZADO", "ALOJAMIENTO", alojamientoId,
+				datosDelEvento(alojamiento, alojamiento.getMotivoRechazo()));
 		return AlojamientoDTO.desde(alojamiento);
 	}
 
@@ -305,6 +313,19 @@ public class AlojamientoService {
 
 	private static boolean esAdministrador(Usuario usuario) {
 		return usuario.getRol() == Rol.ADMINISTRADOR;
+	}
+
+	/** Lo que necesitan las notificaciones del anfitrión (MA-75, escenario 2). */
+	public static Map<String, Object> datosDelEvento(Alojamiento alojamiento, String motivo) {
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("alojamientoId", alojamiento.getId());
+		datos.put("anfitrionId", alojamiento.getAnfitrion().getId());
+		datos.put("titulo", alojamiento.getTitulo());
+		datos.put("estado", alojamiento.getEstado());
+		if (motivo != null) {
+			datos.put("motivo", motivo);
+		}
+		return datos;
 	}
 
 	/**

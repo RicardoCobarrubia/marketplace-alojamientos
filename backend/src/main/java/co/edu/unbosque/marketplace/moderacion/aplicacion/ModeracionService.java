@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
@@ -21,6 +22,7 @@ import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.configuracion.CacheConfig;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
+import co.edu.unbosque.marketplace.notificaciones.aplicacion.PublicadorEventos;
 import co.edu.unbosque.marketplace.reservas.aplicacion.RevisionReservasService;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
@@ -45,15 +47,18 @@ public class ModeracionService {
 	private final RevisionReservasService revisionReservas;
 	private final Auditoria auditoria;
 	private final CacheManager cacheManager;
+	private final PublicadorEventos publicador;
 	private final Clock reloj;
 
 	public ModeracionService(AlojamientoRepository alojamientoRepository, UsuarioRepository usuarioRepository,
-			RevisionReservasService revisionReservas, Auditoria auditoria, CacheManager cacheManager, Clock reloj) {
+			RevisionReservasService revisionReservas, Auditoria auditoria, CacheManager cacheManager,
+			PublicadorEventos publicador, Clock reloj) {
 		this.alojamientoRepository = alojamientoRepository;
 		this.usuarioRepository = usuarioRepository;
 		this.revisionReservas = revisionReservas;
 		this.auditoria = auditoria;
 		this.cacheManager = cacheManager;
+		this.publicador = publicador;
 		this.reloj = reloj;
 	}
 
@@ -72,6 +77,8 @@ public class ModeracionService {
 		alojamiento.bloquear(motivo, reloj.instant());
 		auditoria.registrar(EventoAuditoria.cambio("BLOQUEAR_ALOJAMIENTO", ALOJAMIENTO, alojamientoId, anterior,
 				EstadoAlojamiento.BLOQUEADA, alojamiento.getMotivoBloqueo()));
+		publicador.publicar("ALOJAMIENTO_BLOQUEADO", ALOJAMIENTO, alojamientoId,
+				AlojamientoService.datosDelEvento(alojamiento, alojamiento.getMotivoBloqueo()));
 		int enRevision = revisionReservas.ponerEnRevisionDelAlojamiento(alojamientoId,
 				"Alojamiento bloqueado: " + alojamiento.getMotivoBloqueo());
 		log.info("Alojamiento {} bloqueado; {} reservas en revisión", alojamiento.getId(), enRevision);
