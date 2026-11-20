@@ -18,6 +18,12 @@ Todo se ejecuta desde la carpeta `backend`.
    ```
    docker compose up -d
    ```
+   PostgreSQL toma `DB_PASSWORD` solo la primera vez, al crear la base. Si después cambias la clave en `.env`, la API ya no se puede conectar. Tienes dos caminos:
+   - Conservar los datos: cambia la clave en la base con la misma que pusiste en `.env`:
+     ```
+     docker compose exec postgres psql -U marketplace -d marketplace -c "ALTER USER marketplace WITH PASSWORD 'tu-nueva-clave';"
+     ```
+   - Empezar de cero: `docker compose down -v` y vuelve a levantarla. **Borra todos los datos locales.**
 3. Arranca la API. En Windows (cmd o PowerShell):
    ```
    mvnw.cmd spring-boot:run
