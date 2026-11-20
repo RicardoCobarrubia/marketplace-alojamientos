@@ -40,4 +40,16 @@ public interface NotificacionRepository extends JpaRepository<Notificacion, Long
 	@Query(value = "SELECT * FROM notificacion WHERE id = :id AND correo_estado = 'PENDIENTE' FOR UPDATE SKIP LOCKED",
 			nativeQuery = true)
 	Optional<Notificacion> tomarConCorreoPendiente(@Param("id") Long id);
+
+	/**
+	 * Suma un intento fallido del correo en una sola sentencia: espera a que termine quien tenga
+	 * la fila y solo lo cuenta si el correo sigue pendiente. Al llegar al máximo queda FALLIDO.
+	 */
+	@Modifying
+	@Query(value = """
+			UPDATE notificacion
+			SET correo_intentos = correo_intentos + 1,
+			    correo_estado = CASE WHEN correo_intentos + 1 >= :maximo THEN 'FALLIDO' ELSE correo_estado END
+			WHERE id = :id AND correo_estado = 'PENDIENTE'""", nativeQuery = true)
+	int registrarFalloDeCorreo(@Param("id") Long id, @Param("maximo") int maximo);
 }

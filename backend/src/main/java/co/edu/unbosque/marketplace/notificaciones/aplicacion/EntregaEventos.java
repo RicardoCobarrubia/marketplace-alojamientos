@@ -32,6 +32,8 @@ public class EntregaEventos {
 	private static final Logger log = LoggerFactory.getLogger(EntregaEventos.class);
 	/** Después de estos intentos el evento queda FALLIDO y deja de frenar a los demás. */
 	static final int INTENTOS_MAXIMOS = 5;
+	/** Largo de la columna {@code ultimo_error}. */
+	private static final int LARGO_ERROR = 500;
 
 	private final EventoOutboxRepository eventos;
 	private final NotificacionRepository notificaciones;
@@ -77,13 +79,14 @@ public class EntregaEventos {
 	}
 
 	/**
-	 * Suma el intento fallido en una transacción propia: la de la entrega ya se deshizo. Solo si
-	 * el evento sigue pendiente y nadie más lo tiene tomado: no cambia uno que otra réplica ya
-	 * entregó.
+	 * Suma el intento fallido en una transacción propia: la de la entrega ya se deshizo. Si otra
+	 * réplica lo tiene tomado, espera: si esa lo entrega no lo cambia, y si falla también lo
+	 * cuenta.
 	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void registrarFallo(Long eventoId, String error) {
-		eventos.tomarPendiente(eventoId).ifPresent(evento -> evento.registrarFallo(error, INTENTOS_MAXIMOS));
+		String texto = error != null && error.length() > LARGO_ERROR ? error.substring(0, LARGO_ERROR) : error;
+		eventos.registrarFallo(eventoId, texto, INTENTOS_MAXIMOS);
 	}
 
 	private List<Long> administradores() {

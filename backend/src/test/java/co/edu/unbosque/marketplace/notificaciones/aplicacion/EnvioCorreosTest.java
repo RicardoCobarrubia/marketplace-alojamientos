@@ -86,22 +86,9 @@ class EnvioCorreosTest {
 	}
 
 	@Test
-	void registrarUnFalloSumaElIntento() {
-		when(notificaciones.tomarConCorreoPendiente(1L)).thenReturn(Optional.of(notificacion));
-
+	void registrarUnFalloLoHaceEnLaBaseDeDatos() {
 		envio.registrarFallo(1L);
 
-		assertThat(notificacion.getCorreoIntentos()).isEqualTo(1);
-	}
-
-	@Test
-	void unFalloNoCambiaUnCorreoQueYaSeEnvio() {
-		notificacion.correoEnviado(AHORA);
-		when(notificaciones.tomarConCorreoPendiente(1L)).thenReturn(Optional.empty());
-
-		envio.registrarFallo(1L);
-
-		assertThat(notificacion.getCorreoEstado()).isEqualTo(EstadoCorreo.ENVIADO);
-		assertThat(notificacion.getCorreoIntentos()).isZero();
+		verify(notificaciones).registrarFalloDeCorreo(1L, EnvioCorreos.INTENTOS_MAXIMOS);
 	}
 }

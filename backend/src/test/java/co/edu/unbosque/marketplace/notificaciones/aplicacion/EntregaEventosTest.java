@@ -95,22 +95,11 @@ class EntregaEventosTest {
 	}
 
 	@Test
-	void registrarUnFalloSumaElIntento() {
-		EventoOutbox pendiente = evento("PAGO_FALLIDO", "{}");
-		when(eventos.tomarPendiente(7L)).thenReturn(Optional.of(pendiente));
-
+	void registrarUnFalloLoHaceEnLaBaseDeDatosConElErrorRecortado() {
 		entrega.registrarFallo(7L, "error");
+		entrega.registrarFallo(8L, "x".repeat(600));
 
-		assertThat(pendiente.getIntentos()).isEqualTo(1);
-		assertThat(pendiente.getUltimoError()).isEqualTo("error");
-	}
-
-	@Test
-	void unFalloNoCambiaUnEventoQueOtraReplicaYaEntrego() {
-		when(eventos.tomarPendiente(7L)).thenReturn(Optional.empty());
-
-		entrega.registrarFallo(7L, "error");
-
-		verify(eventos, never()).findById(any());
+		verify(eventos).registrarFallo(7L, "error", EntregaEventos.INTENTOS_MAXIMOS);
+		verify(eventos).registrarFallo(8L, "x".repeat(500), EntregaEventos.INTENTOS_MAXIMOS);
 	}
 }
