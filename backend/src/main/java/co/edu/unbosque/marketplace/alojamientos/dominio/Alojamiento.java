@@ -118,6 +118,10 @@ public class Alojamiento {
 	@Column(name = "motivo_rechazo", length = 500)
 	private String motivoRechazo;
 
+	/** Por qué el administrador lo bloqueó (MA-80). */
+	@Column(name = "motivo_bloqueo", length = 500)
+	private String motivoBloqueo;
+
 	@Column(name = "creado_en", nullable = false, updatable = false)
 	private Instant creadoEn;
 
@@ -293,6 +297,21 @@ public class Alojamiento {
 		this.motivoRechazo = null;
 	}
 
+	/**
+	 * El administrador lo bloquea con motivo (MA-80): deja de mostrarse y de aceptar reservas.
+	 * Se puede bloquear desde cualquier estado que no sea BLOQUEADA.
+	 */
+	public void bloquear(String motivo, Instant ahora) {
+		cambiarEstado(EstadoAlojamiento.BLOQUEADA, ahora);
+		this.motivoBloqueo = motivo.strip();
+	}
+
+	/** Al desbloquearlo queda PAUSADA: el anfitrión decide cuándo reanudarlo (MA-80, escenario 2). */
+	public void desbloquear(Instant ahora) {
+		cambiarEstado(EstadoAlojamiento.PAUSADA, ahora);
+		this.motivoBloqueo = null;
+	}
+
 	public boolean esDe(Long usuarioId) {
 		return anfitrion.getId().equals(usuarioId);
 	}
@@ -367,6 +386,10 @@ public class Alojamiento {
 
 	public EstadoAlojamiento getEstado() {
 		return estado;
+	}
+
+	public String getMotivoBloqueo() {
+		return motivoBloqueo;
 	}
 
 	public String getMotivoRechazo() {

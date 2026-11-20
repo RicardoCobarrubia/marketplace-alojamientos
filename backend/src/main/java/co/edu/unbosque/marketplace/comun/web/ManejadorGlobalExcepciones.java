@@ -15,9 +15,14 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
+import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ExcepcionMarketplace;
 
 /**
@@ -37,8 +42,17 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 	/** Propiedad con el código estable del error, que usa el frontend. */
 	private static final String CODIGO = "codigo";
 
+	private final Auditoria auditoria;
+
+	public ManejadorGlobalExcepciones(Auditoria auditoria) {
+		this.auditoria = auditoria;
+	}
+
 	@ExceptionHandler(ExcepcionMarketplace.class)
 	public ProblemDetail manejarExcepcionDeNegocio(ExcepcionMarketplace ex) {
+		if (ex instanceof AccesoDenegadoException) {
+			auditarAccesoDenegado();
+		}
 		ProblemDetail problema = crear(ex.getEstado(), ex.getTitulo(), ex.getMessage());
 		problema.setProperty(CODIGO, ex.getCodigo());
 		ex.getPropiedadesAdicionales().forEach(problema::setProperty);
@@ -47,6 +61,7 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(AccessDeniedException.class)
 	public ProblemDetail manejarAccesoDenegado(AccessDeniedException ex) {
+		auditarAccesoDenegado();
 		ProblemDetail problema = crear(HttpStatus.FORBIDDEN, "Acceso denegado",
 				"No tienes permiso para realizar esta acción.");
 		problema.setProperty(CODIGO, "ACCESO_DENEGADO");
@@ -89,6 +104,22 @@ public class ManejadorGlobalExcepciones extends ResponseEntityExceptionHandler {
 			problema.setProperty("correlationId", MDC.get(CorrelacionFilter.CLAVE_MDC));
 		}
 		return respuesta;
+	}
+
+	/**
+	 * Todo acceso denegado queda auditado con quién lo intentó y sobre qué recurso (MA-80 y MA-81,
+	 * escenario 3). Si el registro falla, la respuesta 403 se da igual.
+	 */
+	private void auditarAccesoDenegado() {
+		String recurso = "desconocido";
+		if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes atributos) {
+			recurso = atributos.getRequest().getMethod() + " " + atributos.getRequest().getRequestURI();
+		}
+		try {
+			auditoria.registrar(EventoAuditoria.accesoDenegado(recurso));
+		} catch (RuntimeException e) {
+			log.warn("No se pudo auditar un acceso denegado", e);
+		}
 	}
 
 	private ProblemDetail crear(HttpStatus estado, String titulo, String detalle) {

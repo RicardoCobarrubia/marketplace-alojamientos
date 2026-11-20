@@ -38,7 +38,7 @@ import co.edu.unbosque.marketplace.reservas.presentacion.PasarelaDePrueba.Modo;
  * Consultar, cancelar con devolución y completar reservas contra PostgreSQL real (MA-70 a MA-74).
  * Requiere Docker en ejecución.
  */
-@Import({ TestcontainersConfiguration.class, ReservaIntegrationTest.Pasarela.class })
+@Import({ TestcontainersConfiguration.class, PasarelaDePruebaConfig.class })
 @SpringBootTest
 @ActiveProfiles("test")
 class GestionReservasIntegrationTest {

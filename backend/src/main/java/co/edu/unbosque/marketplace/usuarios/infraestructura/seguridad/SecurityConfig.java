@@ -24,6 +24,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+
 /**
  * Configuración de seguridad, con la misma estructura de Software 1: reglas por ruta con
  * {@code hasRole}, filtro JWT antes del de usuario y contraseña, {@code DaoAuthenticationProvider}
@@ -48,9 +50,9 @@ public class SecurityConfig {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http,
-			CorsConfigurationSource corsConfigurationSource) {
+			CorsConfigurationSource corsConfigurationSource, Auditoria auditoria) {
 
-		RespuestasSeguridad respuestas = new RespuestasSeguridad();
+		RespuestasSeguridad respuestas = new RespuestasSeguridad(auditoria);
 
 		http
 			.cors(cors -> cors.configurationSource(corsConfigurationSource))

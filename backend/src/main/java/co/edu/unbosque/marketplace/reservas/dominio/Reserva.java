@@ -357,6 +357,19 @@ public class Reserva {
 		return true;
 	}
 
+	/**
+	 * Por una moderación (alojamiento bloqueado o usuario restringido) la reserva confirmada pasa
+	 * a EN_REVISION sin cancelarse (MA-80, MA-81).
+	 */
+	public void ponerEnRevision(Instant ahora) {
+		cambiarEstado(EstadoReserva.EN_REVISION, ahora);
+	}
+
+	/** El administrador decide mantenerla: EN_REVISION → CONFIRMADA (MA-82). */
+	public void mantener(Instant ahora) {
+		cambiarEstado(EstadoReserva.CONFIRMADA, ahora);
+	}
+
 	/** El huésped que hizo la reserva. */
 	public boolean esDe(Long usuarioId) {
 		return huesped.getId().equals(usuarioId);

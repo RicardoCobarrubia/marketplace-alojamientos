@@ -10,6 +10,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -79,6 +80,10 @@ public class Usuario implements UserDetails {
 
 	@Column(name = "bloqueado_hasta")
 	private Instant bloqueadoHasta;
+
+	/** Por qué el administrador restringió la cuenta (MA-81). */
+	@Column(name = "motivo_restriccion", length = 500)
+	private String motivoRestriccion;
 
 	@Column(name = "creado_en", nullable = false, updatable = false)
 	private Instant creadoEn;
@@ -200,6 +205,32 @@ public class Usuario implements UserDetails {
 		bloqueadoHasta = null;
 	}
 
+	// ─────────────────────────────────────────
+	// Moderación — MA-81
+	// ─────────────────────────────────────────
+
+	/**
+	 * El administrador restringe la cuenta: no puede iniciar sesión y todos sus tokens dejan de
+	 * valer, porque cambia la versión de sesión. Dura hasta que un administrador la levante.
+	 */
+	public void restringir(String motivo) {
+		if (estadoCuenta == EstadoCuenta.RESTRINGIDA) {
+			throw new ReglaNegocioException("YA_RESTRINGIDA", "La cuenta ya está restringida.");
+		}
+		this.estadoCuenta = EstadoCuenta.RESTRINGIDA;
+		this.motivoRestriccion = motivo.strip();
+		this.versionSesion++;
+	}
+
+	/** El administrador levanta la restricción: la cuenta vuelve a estar activa. */
+	public void levantarRestriccion() {
+		if (estadoCuenta != EstadoCuenta.RESTRINGIDA) {
+			throw new ReglaNegocioException("NO_RESTRINGIDA", "La cuenta no está restringida.");
+		}
+		this.estadoCuenta = EstadoCuenta.ACTIVA;
+		this.motivoRestriccion = null;
+	}
+
 	public boolean estaActiva() {
 		return estadoCuenta == EstadoCuenta.ACTIVA;
 	}
@@ -230,6 +261,10 @@ public class Usuario implements UserDetails {
 
 	public EstadoCuenta getEstadoCuenta() {
 		return estadoCuenta;
+	}
+
+	public String getMotivoRestriccion() {
+		return motivoRestriccion;
 	}
 
 	public int getVersionSesion() {

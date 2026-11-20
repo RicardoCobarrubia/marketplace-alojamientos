@@ -1,5 +1,7 @@
 package co.edu.unbosque.marketplace.usuarios.dominio;
 
+import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
@@ -77,5 +79,29 @@ class UsuarioTest {
 	@Test
 	void toStringNoMuestraElHash() {
 		assertThat(TestDatos.usuario(1L, Rol.HUESPED, "hash-secreto").toString()).doesNotContain("hash-secreto");
+	}
+
+	// ─────────────────────────────────────────
+	// Moderación — MA-81
+	// ─────────────────────────────────────────
+
+	@Test
+	void alRestringirloNoPuedeEntrarYSusTokensDejanDeValer() {
+		Usuario usuario = TestDatos.usuario(1L, Rol.ANFITRION, "hash");
+		int version = usuario.getVersionSesion();
+
+		usuario.restringir(" Fraude ");
+
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.RESTRINGIDA);
+		assertThat(usuario.getMotivoRestriccion()).isEqualTo("Fraude");
+		assertThat(usuario.getVersionSesion()).isEqualTo(version + 1);
+		assertThat(usuario.isAccountNonLocked()).isFalse();
+		assertThat(usuario.estaActiva()).isFalse();
+		assertThatThrownBy(() -> usuario.restringir("Otra vez")).isInstanceOf(ReglaNegocioException.class);
+
+		usuario.levantarRestriccion();
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.ACTIVA);
+		assertThat(usuario.getMotivoRestriccion()).isNull();
+		assertThatThrownBy(usuario::levantarRestriccion).isInstanceOf(ReglaNegocioException.class);
 	}
 }

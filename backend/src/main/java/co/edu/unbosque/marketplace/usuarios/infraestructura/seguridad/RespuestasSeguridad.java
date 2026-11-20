@@ -3,6 +3,8 @@ package co.edu.unbosque.marketplace.usuarios.infraestructura.seguridad;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -11,6 +13,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.web.CorrelacionFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,6 +25,14 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 public class RespuestasSeguridad implements AuthenticationEntryPoint, AccessDeniedHandler {
 
+	private static final Logger log = LoggerFactory.getLogger(RespuestasSeguridad.class);
+
+	private final Auditoria auditoria;
+
+	public RespuestasSeguridad(Auditoria auditoria) {
+		this.auditoria = auditoria;
+	}
+
 	/** Sin token, token inválido, vencido o revocado. */
 	@Override
 	public void commence(HttpServletRequest request, HttpServletResponse response,
@@ -29,10 +41,15 @@ public class RespuestasSeguridad implements AuthenticationEntryPoint, AccessDeni
 				"Debes iniciar sesión para realizar esta acción.");
 	}
 
-	/** Autenticado, pero su rol no tiene permiso. */
+	/** Autenticado, pero su rol no tiene permiso. Queda auditado (MA-80 y MA-81, escenario 3). */
 	@Override
 	public void handle(HttpServletRequest request, HttpServletResponse response,
 			AccessDeniedException accessDeniedException) throws IOException {
+		try {
+			auditoria.registrar(EventoAuditoria.accesoDenegado(request.getMethod() + " " + request.getRequestURI()));
+		} catch (RuntimeException e) {
+			log.warn("No se pudo auditar un acceso denegado", e);
+		}
 		escribir(response, HttpStatus.FORBIDDEN, "Acceso denegado", "ACCESO_DENEGADO",
 				"No tienes permiso para realizar esta acción.");
 	}

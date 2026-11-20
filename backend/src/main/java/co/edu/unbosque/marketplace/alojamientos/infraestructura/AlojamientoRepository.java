@@ -18,6 +18,9 @@ public interface AlojamientoRepository extends JpaRepository<Alojamiento, Long> 
 
 	List<Alojamiento> findByEstadoOrderByActualizadoEnAsc(EstadoAlojamiento estado);
 
+	/** Los alojamientos de un anfitrión en un estado, por ejemplo los ACTIVA al restringirlo (MA-81). */
+	List<Alojamiento> findByAnfitrionIdAndEstado(Long anfitrionId, EstadoAlojamiento estado);
+
 	List<Alojamiento> findAllByOrderByCreadoEnDesc();
 
 	/**
