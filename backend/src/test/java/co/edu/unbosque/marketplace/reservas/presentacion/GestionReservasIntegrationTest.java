@@ -10,12 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -240,35 +239,35 @@ class GestionReservasIntegrationTest {
 	}
 
 	@Test
-	void dosEjecucionesSimultaneasPidenLaDevolucionUnaSolaVez() throws Exception {
+	void mientrasUnaEjecucionPideLaDevolucionOtraNoEntraALaPasarela() throws Exception {
 		long id = reservar(huesped, "r-1", LLEGADA, SALIDA);
 		pasarela.modo(Modo.CAIDA);
 		cancelar(huesped, id, "{\"motivo\":\"Cambio de planes\"}").andExpect(status().isOk());
 		jdbc.update("UPDATE reserva SET devolucion_reclamada_hasta = NULL WHERE id = ?", id);
 		pasarela.modo(Modo.APROBAR);
+		CountDownLatch dentro = new CountDownLatch(1);
+		CountDownLatch soltar = new CountDownLatch(1);
+		pasarela.detenerSiguienteDevolucion(dentro, soltar);
 
-		ExecutorService hilos = Executors.newFixedThreadPool(10);
-		CountDownLatch salida = new CountDownLatch(1);
-		List<Future<Integer>> resultados = new ArrayList<>();
+		ExecutorService hilo = Executors.newSingleThreadExecutor();
 		try {
-			for (int i = 0; i < 10; i++) {
-				resultados.add(hilos.submit(() -> {
-					salida.await();
-					return conciliador.reintentarDevoluciones();
-				}));
-			}
-			salida.countDown();
-			int solicitadas = 0;
-			for (Future<Integer> resultado : resultados) {
-				solicitadas += resultado.get();
-			}
-			assertThat(solicitadas).isEqualTo(1);
+			Future<Integer> primera = hilo.submit(() -> conciliador.reintentarDevoluciones());
+			assertThat(dentro.await(30, TimeUnit.SECONDS)).isTrue();
+
+			// La primera sigue dentro de la pasarela: la segunda no entra
+			assertThat(conciliador.reintentarDevoluciones()).isZero();
+
+			soltar.countDown();
+			assertThat(primera.get(30, TimeUnit.SECONDS)).isEqualTo(1);
 		} finally {
-			hilos.shutdownNow();
+			hilo.shutdownNow();
 		}
-		assertThat(pasarela.devoluciones()).isEqualTo(1);
-		assertThat(jdbc.queryForObject("SELECT intentos_devolucion FROM reserva WHERE id = ?", Integer.class, id))
-				.isEqualTo(2);
+		String referencia = referencia(id);
+		// El intento fallido (sin respuesta) y el reintento usan la misma clave
+		assertThat(pasarela.llamadasDevolucion()).containsExactly(
+				referencia + " 693000 reserva-" + id + "-cancelacion 1",
+				referencia + " 693000 reserva-" + id + "-cancelacion 1");
+		assertThat(conciliador.reintentarDevoluciones()).isZero();
 	}
 
 	@Test
@@ -311,6 +310,7 @@ class GestionReservasIntegrationTest {
 				.isFalse();
 		assertThat(conciliador.reintentarDevoluciones()).isZero();
 		assertThat(pasarela.devoluciones()).isEqualTo(1);
+		assertThat(pasarela.llamadasDevolucion()).hasSize(2);
 	}
 
 	// ─────────────────────────────────────────

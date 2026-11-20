@@ -252,6 +252,11 @@ public class ReservaTransacciones {
 		return bloquear(reservaId).reclamarDevolucion(reloj.instant(), PLAZO_DEVOLUCION);
 	}
 
+	@Transactional
+	public void registrarFalloDevolucion(Long reservaId, boolean puedeSeguirEnCurso) {
+		bloquear(reservaId).devolucionFallida(puedeSeguirEnCurso, reloj.instant());
+	}
+
 	/** La pasarela aceptó la devolución de una cancelación (MA-73, escenario 2). */
 	@Transactional
 	public void marcarDevolucionSolicitada(Long reservaId) {

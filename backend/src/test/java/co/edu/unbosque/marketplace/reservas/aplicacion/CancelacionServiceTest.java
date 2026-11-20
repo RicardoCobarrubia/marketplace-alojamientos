@@ -85,6 +85,7 @@ class CancelacionServiceTest {
 
 		assertThat(servicio.cancelar(huesped, 50L, "Motivo")).isSameAs(pendiente);
 		verify(transacciones, never()).marcarDevolucionSolicitada(any());
+		verify(transacciones).registrarFalloDevolucion(50L, true);
 	}
 
 	@Test
@@ -125,5 +126,16 @@ class CancelacionServiceTest {
 
 		assertThat(servicio.devolucionesPendientes()).containsExactly(50L);
 		assertThatThrownBy(() -> servicio.devolver(50L)).isInstanceOf(PasarelaNoDisponibleException.class);
+		verify(transacciones).registrarFalloDevolucion(50L, true);
+	}
+
+	@Test
+	void unErrorConRespuestaSeRegistraParaCambiarDeClave() {
+		conDevolucionPendiente();
+		doThrow(PasarelaNoDisponibleException.conRespuesta("500")).when(pasarela).devolver("pi_1", VALOR,
+				"reserva-50-cancelacion", 1);
+
+		assertThatThrownBy(() -> servicio.devolver(50L)).isInstanceOf(PasarelaNoDisponibleException.class);
+		verify(transacciones).registrarFalloDevolucion(50L, false);
 	}
 }

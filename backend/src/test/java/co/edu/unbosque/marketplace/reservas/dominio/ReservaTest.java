@@ -259,11 +259,36 @@ class ReservaTest {
 
 		assertThat(reserva.reclamarDevolucion(AHORA, plazo)).hasValue(1);
 		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(60), plazo)).isEmpty();
-		// Si la primera falló o se cayó, el reclamo vence y se puede reintentar
-		assertThat(reserva.reclamarDevolucion(AHORA.plus(plazo), plazo)).hasValue(2);
+		// Si la primera se cayó, el reclamo vence y se reintenta con la misma clave
+		assertThat(reserva.reclamarDevolucion(AHORA.plus(plazo), plazo)).hasValue(1);
 
 		reserva.devolucionSolicitada(AHORA.plusSeconds(200));
 		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(500), plazo)).isEmpty();
+	}
+
+	@Test
+	void sinRespuestaDeLaPasarelaSeConservanElReclamoYLaClave() {
+		reserva.confirmar("pi_1", AHORA);
+		reserva.cancelar(2L, "Cambio de planes", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
+		Duration plazo = Duration.ofMinutes(2);
+		reserva.reclamarDevolucion(AHORA, plazo);
+
+		reserva.devolucionFallida(true, AHORA.plusSeconds(10));
+
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(20), plazo)).isEmpty();
+		assertThat(reserva.reclamarDevolucion(AHORA.plus(plazo), plazo)).hasValue(1);
+	}
+
+	@Test
+	void conUnErrorDeLaPasarelaSeSueltaElReclamoYCambiaLaClave() {
+		reserva.confirmar("pi_1", AHORA);
+		reserva.cancelar(2L, "Cambio de planes", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
+		Duration plazo = Duration.ofMinutes(2);
+		reserva.reclamarDevolucion(AHORA, plazo);
+
+		reserva.devolucionFallida(false, AHORA.plusSeconds(10));
+
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(20), plazo)).hasValue(2);
 	}
 
 	@Test

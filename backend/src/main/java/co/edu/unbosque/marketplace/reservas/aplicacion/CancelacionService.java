@@ -60,11 +60,12 @@ public class CancelacionService {
 
 	/**
 	 * Pide a la pasarela la devolución pendiente de una reserva cancelada. Antes la reclama: si
-	 * otra ejecución la está pidiendo, no hace nada, así dos ejecuciones a la vez no devuelven dos
-	 * veces. Cada intento usa su propia clave y la pasarela solo devuelve lo que falta.
+	 * otra ejecución la está pidiendo, no hace nada, así dos ejecuciones a la vez no la piden las
+	 * dos. La pasarela solo devuelve lo que falta.
 	 * <p>
-	 * Si la pasarela falla, el reclamo no se suelta: vence solo, para no reintentar mientras la
-	 * petición anterior pueda seguir en curso en la pasarela.
+	 * Si la pasarela no respondió, el reclamo vence solo y el reintento usa la misma clave: si la
+	 * petición anterior seguía en curso, la pasarela no la repite. Si respondió con un error, el
+	 * reintento usa una clave nueva.
 	 *
 	 * @return si se pidió la devolución
 	 * @throws PasarelaNoDisponibleException si la pasarela no la aceptó; sigue pendiente
@@ -76,8 +77,13 @@ public class CancelacionService {
 		}
 		Reserva reserva = transacciones.buscar(reservaId)
 				.orElseThrow(() -> new IllegalStateException("La reserva " + reservaId + " no existe."));
-		pasarela.devolver(reserva.getReferenciaPago(), reserva.getValorDevolucion(),
-				"reserva-" + reservaId + "-cancelacion", intento.getAsInt());
+		try {
+			pasarela.devolver(reserva.getReferenciaPago(), reserva.getValorDevolucion(),
+					"reserva-" + reservaId + "-cancelacion", intento.getAsInt());
+		} catch (PasarelaNoDisponibleException e) {
+			transacciones.registrarFalloDevolucion(reservaId, e.puedeSeguirEnCurso());
+			throw e;
+		}
 		transacciones.marcarDevolucionSolicitada(reservaId);
 		log.info("Devolución solicitada para la reserva cancelada {}", reserva.getId());
 		return true;

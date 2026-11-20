@@ -302,8 +302,11 @@ public class Reserva {
 	/**
 	 * Reserva para una sola ejecución la solicitud de la devolución pendiente durante
 	 * {@code plazo}: mientras tanto, otra ejecución (por ejemplo el conciliador) no la pide a la
-	 * vez y no se devuelve dos veces. Si la ejecución falla o se cae, el reclamo vence solo y la
-	 * devolución se puede reintentar.
+	 * vez. Si la ejecución se cae, el reclamo vence solo y la devolución se puede reintentar.
+	 * <p>
+	 * El intento (que forma la clave de idempotencia) solo cambia cuando la pasarela respondió con
+	 * un error ({@link #devolucionFallida}). Así, si un reclamo vence mientras su petición sigue en
+	 * curso, el reintento usa la misma clave y la pasarela no devuelve dos veces.
 	 *
 	 * @return el número del intento, o vacío si no hay devolución pendiente o ya otra la reclamó
 	 */
@@ -313,7 +316,25 @@ public class Reserva {
 		}
 		this.devolucionReclamadaHasta = ahora.plus(plazo);
 		this.actualizadoEn = ahora;
-		return OptionalInt.of(++intentosDevolucion);
+		if (intentosDevolucion == 0) {
+			intentosDevolucion = 1;
+		}
+		return OptionalInt.of(intentosDevolucion);
+	}
+
+	/**
+	 * La pasarela no aceptó la devolución.
+	 *
+	 * @param puedeSeguirEnCurso no hubo respuesta: se conservan el reclamo hasta que venza y el
+	 *        intento, para reintentar con la misma clave. Si la pasarela respondió con un error,
+	 *        se suelta el reclamo y el siguiente intento usa una clave nueva.
+	 */
+	public void devolucionFallida(boolean puedeSeguirEnCurso, Instant ahora) {
+		if (!puedeSeguirEnCurso) {
+			intentosDevolucion++;
+			devolucionReclamadaHasta = null;
+		}
+		this.actualizadoEn = ahora;
 	}
 
 	/** La pasarela aceptó la devolución de la cancelación (MA-73, escenario 2). */
