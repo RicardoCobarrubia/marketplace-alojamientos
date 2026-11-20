@@ -85,7 +85,13 @@ public record ReservaDTO(
 		String motivoCancelacion,
 
 		@JsonProperty(access = Access.READ_ONLY)
-		Instant canceladaEn) {
+		Instant canceladaEn,
+
+		@JsonProperty(access = Access.READ_ONLY)
+		BigDecimal valorDevolucion,
+
+		@JsonProperty(access = Access.READ_ONLY)
+		Boolean devolucionPendiente) {
 
 	/** Servicio adicional contratado con el precio que tenía al reservar. */
 	public record ServicioReservado(Long servicioId, String nombre, Modalidad modalidad, BigDecimal costoUnitario,
@@ -105,6 +111,7 @@ public record ReservaDTO(
 				reserva.getHuesped().getId(), reserva.getNoches(), reserva.getPrecioNoche(), reserva.getSubtotal(),
 				reserva.getTotalDescuentos(), reserva.getLimpieza(), servicios, reserva.getTotalServicios(),
 				reserva.getTarifaServicio(), reserva.getTotal(), reserva.getMotivoFallo(), reserva.getCreadoEn(),
-				reserva.getMotivoCancelacion(), reserva.getCanceladaEn());
+				reserva.getMotivoCancelacion(), reserva.getCanceladaEn(), reserva.getValorDevolucion(),
+				reserva.isDevolucionPendiente());
 	}
 }

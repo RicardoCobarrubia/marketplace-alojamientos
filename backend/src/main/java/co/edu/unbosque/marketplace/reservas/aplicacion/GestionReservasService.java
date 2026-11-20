@@ -1,9 +1,12 @@
 package co.edu.unbosque.marketplace.reservas.aplicacion;
 
+import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,15 +21,19 @@ import org.springframework.transaction.annotation.Transactional;
 import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.disponibilidad.infraestructura.PeriodoReservadoRepository;
+import co.edu.unbosque.marketplace.reservas.dominio.CalculadoraDevolucion;
 import co.edu.unbosque.marketplace.reservas.dominio.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.dominio.Reserva;
 import co.edu.unbosque.marketplace.reservas.infraestructura.FiltrosReserva;
 import co.edu.unbosque.marketplace.reservas.infraestructura.ReservaRepository;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
+import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Lo que pasa con una reserva después de confirmada: consultarla (MA-70), cancelarla (MA-72) y
- * completarla al pasar la fecha de salida (MA-71).
+ * Lo que pasa con una reserva después de confirmada: consultarla (MA-70), cancelarla con su
+ * devolución (MA-72 a MA-74) y completarla al pasar la fecha de salida (MA-71).
  */
 @Service
 public class GestionReservasService {
@@ -37,15 +44,20 @@ public class GestionReservasService {
 	private final ReservaRepository reservaRepository;
 	private final PeriodoReservadoRepository periodoReservadoRepository;
 	private final EventosReserva eventos;
+	private final CalculadoraDevolucion calculadora;
+	private final ObjectMapper json;
 	private final Clock reloj;
 	private final ZoneId zonaHoraria;
 
 	public GestionReservasService(ReservaRepository reservaRepository,
-			PeriodoReservadoRepository periodoReservadoRepository, EventosReserva eventos, Clock reloj,
+			PeriodoReservadoRepository periodoReservadoRepository, EventosReserva eventos,
+			CalculadoraDevolucion calculadora, ObjectMapper json, Clock reloj,
 			@Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
 		this.reservaRepository = reservaRepository;
 		this.periodoReservadoRepository = periodoReservadoRepository;
 		this.eventos = eventos;
+		this.calculadora = calculadora;
+		this.json = json;
 		this.reloj = reloj;
 		this.zonaHoraria = zonaHoraria;
 	}
@@ -70,30 +82,53 @@ public class GestionReservasService {
 	}
 
 	// ─────────────────────────────────────────
-	// Cancelar — MA-72
+	// Cancelar — MA-72, MA-73, MA-74
 	// ─────────────────────────────────────────
 
 	/**
-	 * El huésped cancela su reserva. En una sola transacción la reserva queda CANCELADA con quién,
-	 * cuándo y por qué, se liberan sus fechas y se guarda el evento: no queda una cancelación a
-	 * medias. El anfitrión no puede cancelar (MA-74, escenario 2).
+	 * El huésped o el administrador cancela la reserva. En una sola transacción la reserva queda
+	 * CANCELADA con quién, cuándo, por qué y cuánto se devuelve, se liberan sus fechas y se guarda
+	 * el evento: no queda una cancelación a medias (MA-74, escenario 3). La devolución queda
+	 * pendiente y se pide a la pasarela fuera de la transacción ({@link CancelacionService}).
+	 * <p>
+	 * El anfitrión no puede cancelar (MA-74, escenario 2).
 	 */
 	@Transactional
 	public ReservaDTO cancelar(Usuario usuario, Long reservaId, String motivo) {
 		Reserva reserva = reservaRepository.buscarParaActualizar(reservaId)
 				.filter(encontrada -> encontrada.esVisiblePara(usuario))
 				.orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
-		if (!reserva.esDe(usuario.getId())) {
-			throw new AccesoDenegadoException("Solo el huésped que hizo la reserva puede cancelarla.");
+		boolean porAdministrador = usuario.getRol() == Rol.ADMINISTRADOR;
+		if (!porAdministrador && !reserva.esDe(usuario.getId())) {
+			throw new AccesoDenegadoException("Solo el huésped que hizo la reserva o un administrador puede cancelarla.");
 		}
 		Instant ahora = reloj.instant();
-		reserva.cancelar(usuario.getId(), motivo, hoy(), ahora);
+		reserva.cancelar(usuario.getId(), motivo, devolucion(reserva, ahora, porAdministrador), hoy(), ahora);
 		periodoReservadoRepository.bloquearPorReserva(reservaId)
 				.filter(fechas -> fechas.getLiberadoEn() == null)
 				.ifPresent(fechas -> fechas.liberar(ahora));
-		eventos.publicar("RESERVA_CANCELADA", reserva, Map.of("motivo", reserva.getMotivoCancelacion()));
-		log.info("Reserva {} cancelada por el huésped", reservaId);
+		Map<String, Object> datos = new LinkedHashMap<>();
+		datos.put("motivo", reserva.getMotivoCancelacion());
+		datos.put("canceladaPor", usuario.getRol());
+		datos.put("valorDevolucion", reserva.getValorDevolucion());
+		eventos.publicar("RESERVA_CANCELADA", reserva, datos);
+		log.info("Reserva {} cancelada ({}); se devuelven {}", reservaId, usuario.getRol(),
+				reserva.getValorDevolucion());
 		return ReservaDTO.desde(reserva);
+	}
+
+	/**
+	 * MA-73, escenario 1: según la política copiada al reservar y la anticipación hasta el inicio
+	 * del día de llegada.
+	 */
+	private BigDecimal devolucion(Reserva reserva, Instant ahora, boolean porAdministrador) {
+		Duration anticipacion = Duration.between(ahora,
+				reserva.getFechaLlegada().atStartOfDay(zonaHoraria).toInstant());
+		Map<String, Object> parametros = json.readValue(reserva.getPoliticaCancelacion(),
+				new TypeReference<Map<String, Object>>() {
+				});
+		return calculadora.calcular(reserva.getPoliticaCancelacionCodigo(), parametros, reserva.getTotal(),
+				anticipacion, porAdministrador);
 	}
 
 	// ─────────────────────────────────────────

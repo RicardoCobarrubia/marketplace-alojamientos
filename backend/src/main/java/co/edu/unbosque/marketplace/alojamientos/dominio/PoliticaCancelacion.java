@@ -12,8 +12,8 @@ import jakarta.persistence.Table;
 
 /**
  * Política de cancelación asociada a un alojamiento. Los parámetros (horas, porcentajes) se
- * guardan en JSON para poder ajustarlos sin cambiar código; el cálculo de la devolución se
- * implementa en MA-73.
+ * guardan en JSON para poder ajustarlos sin cambiar código. La reserva copia el código y los
+ * parámetros al reservar, y la devolución la calcula la regla con ese código (MA-73).
  */
 @Entity
 @Table(name = "politica_cancelacion")

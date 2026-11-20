@@ -26,6 +26,8 @@ class ConciliadorReservasTest {
 	private ReservaService reservaService;
 	@Mock
 	private GestionReservasService gestion;
+	@Mock
+	private CancelacionService cancelaciones;
 
 	@Test
 	void venceLasRetencionesYVerificaLosPagosEnDuda() {
@@ -36,7 +38,7 @@ class ConciliadorReservasTest {
 		when(transacciones.buscar(1L)).thenReturn(Optional.of(vencida));
 		when(transacciones.buscar(2L)).thenReturn(Optional.of(enDuda));
 
-		new ConciliadorReservas(transacciones, reservaService, gestion).conciliar();
+		new ConciliadorReservas(transacciones, reservaService, gestion, cancelaciones).conciliar();
 
 		verify(reservaService).vencer(vencida);
 		verify(reservaService).verificarPago(enDuda);
@@ -54,7 +56,7 @@ class ConciliadorReservasTest {
 		Reserva enDuda = mock(Reserva.class);
 		when(transacciones.buscar(3L)).thenReturn(Optional.of(enDuda));
 		doThrow(new PasarelaNoDisponibleException("caída")).when(reservaService).verificarPago(enDuda);
-		ConciliadorReservas conciliador = new ConciliadorReservas(transacciones, reservaService, gestion);
+		ConciliadorReservas conciliador = new ConciliadorReservas(transacciones, reservaService, gestion, cancelaciones);
 
 		assertThat(conciliador.vencerRetenciones()).isEqualTo(1);
 		assertThat(conciliador.verificarPagosEnDuda()).isZero();
@@ -68,7 +70,18 @@ class ConciliadorReservasTest {
 		when(gestion.completar(2L)).thenThrow(new IllegalStateException("falla"));
 		when(gestion.completar(3L)).thenReturn(false);
 
-		assertThat(new ConciliadorReservas(transacciones, reservaService, gestion).completarTerminadas()).isEqualTo(1);
+		assertThat(new ConciliadorReservas(transacciones, reservaService, gestion, cancelaciones).completarTerminadas()).isEqualTo(1);
 		verify(gestion).completar(3L);
+	}
+
+	@Test
+	void reintentaLasDevolucionesPendientesAunqueUnaFalle() {
+		when(cancelaciones.devolucionesPendientes()).thenReturn(List.of(1L, 2L, 3L));
+		doThrow(new PasarelaNoDisponibleException("caída")).when(cancelaciones).devolver(1L);
+		doThrow(new IllegalStateException("falla")).when(cancelaciones).devolver(2L);
+
+		assertThat(new ConciliadorReservas(transacciones, reservaService, gestion, cancelaciones)
+				.reintentarDevoluciones()).isEqualTo(1);
+		verify(cancelaciones).devolver(3L);
 	}
 }

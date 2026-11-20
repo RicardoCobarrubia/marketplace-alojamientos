@@ -47,6 +47,10 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long>, JpaSpec
 			order by r.fechaSalida""")
 	List<Long> buscarPorEstadoConSalidaHasta(@Param("estado") EstadoReserva estado, @Param("hoy") LocalDate hoy);
 
+	/** Cancelaciones cuya devolución la pasarela todavía no aceptó (MA-74, escenario 3). */
+	@Query("select r.id from Reserva r where r.devolucionPendiente = true order by r.canceladaEn")
+	List<Long> buscarDevolucionesPendientes();
+
 	@Query("select r.id from Reserva r where r.pagoPorVerificar = true order by r.actualizadoEn")
 	List<Long> buscarPagosPorVerificar();
 }

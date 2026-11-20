@@ -269,7 +269,9 @@ public class ReservaService {
 			return;
 		}
 		ResultadoPago real = pasarela.consultar(referencia);
-		if (real.aprobado() && reserva.getEstado() != EstadoReserva.CONFIRMADA) {
+		// Un cobro que llegó a confirmar la reserva no se devuelve aquí: si después se canceló,
+		// la devolución es la de la política (MA-73)
+		if (real.aprobado() && !reserva.getEstado().fueConfirmada()) {
 			int intento = transacciones.siguienteIntentoDevolucion(reserva.getId());
 			pasarela.devolver(referencia, reserva.getTotal(), clavePago(reserva.getId()), intento);
 			log.info("Devolución solicitada para la reserva {} (pago verificado)", reserva.getId());

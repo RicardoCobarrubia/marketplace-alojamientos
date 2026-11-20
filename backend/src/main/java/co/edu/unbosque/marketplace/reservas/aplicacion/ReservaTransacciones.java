@@ -238,6 +238,21 @@ public class ReservaTransacciones {
 		return bloquear(reservaId).siguienteIntentoDevolucion(reloj.instant());
 	}
 
+	/** La pasarela aceptó la devolución de una cancelación (MA-73, escenario 2). */
+	@Transactional
+	public void marcarDevolucionSolicitada(Long reservaId) {
+		Reserva reserva = bloquear(reservaId);
+		if (reserva.isDevolucionPendiente()) {
+			reserva.devolucionSolicitada(reloj.instant());
+			eventos.publicar("DEVOLUCION_SOLICITADA", reserva, Map.of("valorDevolucion", reserva.getValorDevolucion()));
+		}
+	}
+
+	@Transactional(readOnly = true)
+	public List<Long> devolucionesPendientes() {
+		return reservaRepository.buscarDevolucionesPendientes();
+	}
+
 	@Transactional
 	public void marcarPagoVerificado(Long reservaId, String referenciaPago) {
 		bloquear(reservaId).pagoVerificado(referenciaPago, reloj.instant());

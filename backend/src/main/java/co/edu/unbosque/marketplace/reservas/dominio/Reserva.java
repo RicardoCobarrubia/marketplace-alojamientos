@@ -111,6 +111,9 @@ public class Reserva {
 	@Column(name = "politica_cancelacion_id", nullable = false, updatable = false)
 	private Short politicaCancelacionId;
 
+	@Column(name = "politica_cancelacion_codigo", nullable = false, updatable = false, length = 40)
+	private String politicaCancelacionCodigo;
+
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name = "politica_cancelacion", nullable = false, updatable = false, columnDefinition = "jsonb")
 	private String politicaCancelacion;
@@ -144,6 +147,14 @@ public class Reserva {
 
 	@Column(name = "cancelada_en")
 	private Instant canceladaEn;
+
+	/** Lo que se devuelve al cancelar según la política (MA-73, MA-74). */
+	@Column(name = "valor_devolucion", precision = 12, scale = 2)
+	private BigDecimal valorDevolucion;
+
+	/** La devolución se calculó pero la pasarela todavía no la aceptó: el conciliador la reintenta. */
+	@Column(name = "devolucion_pendiente", nullable = false)
+	private boolean devolucionPendiente;
 
 	@Column(name = "correlation_id", length = 100, updatable = false)
 	private String correlationId;
@@ -183,6 +194,7 @@ public class Reserva {
 				linea.nombre(), linea.modalidad(), linea.costoUnitario(), Math.toIntExact(linea.cantidad()),
 				linea.valor())));
 		this.politicaCancelacionId = alojamiento.getPoliticaCancelacion().getId();
+		this.politicaCancelacionCodigo = alojamiento.getPoliticaCancelacion().getCodigo();
 		this.politicaCancelacion = alojamiento.getPoliticaCancelacion().getParametros();
 		this.correlationId = correlationId;
 		this.creadoEn = ahora;
@@ -251,12 +263,14 @@ public class Reserva {
 	// ─────────────────────────────────────────
 
 	/**
-	 * El huésped cancela su reserva: CONFIRMADA o EN_REVISION → CANCELADA, siempre antes del día
-	 * de llegada (MA-72). Una reserva en curso, completada o ya cancelada no se puede cancelar.
+	 * El huésped o el administrador cancela la reserva: CONFIRMADA o EN_REVISION → CANCELADA,
+	 * siempre antes del día de llegada (MA-72). Una reserva en curso, completada o ya cancelada no
+	 * se puede cancelar. Queda registrado quién, cuándo, por qué y cuánto se devuelve (MA-74).
 	 *
+	 * @param devolucion valor a devolver según la política, entre cero y el total
 	 * @param hoy la fecha de hoy en la zona horaria del marketplace
 	 */
-	public void cancelar(Long usuarioId, String motivo, LocalDate hoy, Instant ahora) {
+	public void cancelar(Long usuarioId, String motivo, BigDecimal devolucion, LocalDate hoy, Instant ahora) {
 		if (motivo == null || motivo.isBlank()) {
 			throw new SolicitudInvalidaException("MOTIVO_REQUERIDO", "Debes indicar el motivo de la cancelación.");
 		}
@@ -268,10 +282,21 @@ public class Reserva {
 			throw new ReglaNegocioException("CANCELACION_NO_PERMITIDA",
 					"La estadía ya empezó o terminó: la reserva no se puede cancelar.");
 		}
+		if (devolucion == null || devolucion.signum() < 0 || devolucion.compareTo(total) > 0) {
+			throw new IllegalArgumentException("La devolución debe estar entre cero y el total de la reserva.");
+		}
 		cambiarEstado(EstadoReserva.CANCELADA, ahora);
 		this.motivoCancelacion = motivo.strip();
 		this.canceladaPor = usuarioId;
 		this.canceladaEn = ahora;
+		this.valorDevolucion = devolucion;
+		this.devolucionPendiente = devolucion.signum() > 0 && referenciaPago != null;
+	}
+
+	/** La pasarela aceptó la devolución de la cancelación (MA-73, escenario 2). */
+	public void devolucionSolicitada(Instant ahora) {
+		this.devolucionPendiente = false;
+		this.actualizadoEn = ahora;
 	}
 
 	/**
@@ -414,6 +439,18 @@ public class Reserva {
 
 	public Instant getCanceladaEn() {
 		return canceladaEn;
+	}
+
+	public String getPoliticaCancelacionCodigo() {
+		return politicaCancelacionCodigo;
+	}
+
+	public BigDecimal getValorDevolucion() {
+		return valorDevolucion;
+	}
+
+	public boolean isDevolucionPendiente() {
+		return devolucionPendiente;
 	}
 
 	public String getCorrelationId() {

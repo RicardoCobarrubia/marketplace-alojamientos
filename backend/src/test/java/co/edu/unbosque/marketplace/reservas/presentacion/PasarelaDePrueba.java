@@ -32,6 +32,7 @@ public class PasarelaDePrueba implements PasarelaPagos {
 	private final Map<String, String> preparados = new ConcurrentHashMap<>();
 	private final Set<String> cobrados = ConcurrentHashMap.newKeySet();
 	private final Set<String> devoluciones = ConcurrentHashMap.newKeySet();
+	private final Map<String, BigDecimal> montosDevueltos = new ConcurrentHashMap<>();
 	private final AtomicInteger llamadasCobro = new AtomicInteger();
 
 	public void modo(Modo nuevo) {
@@ -43,6 +44,7 @@ public class PasarelaDePrueba implements PasarelaPagos {
 		preparados.clear();
 		cobrados.clear();
 		devoluciones.clear();
+		montosDevueltos.clear();
 		llamadasCobro.set(0);
 	}
 
@@ -56,6 +58,11 @@ public class PasarelaDePrueba implements PasarelaPagos {
 
 	public int devoluciones() {
 		return devoluciones.size();
+	}
+
+	/** Lo último que se pidió devolver de un cobro. */
+	public BigDecimal montoDevuelto(String referencia) {
+		return montosDevueltos.get(referencia);
 	}
 
 	@Override
@@ -97,5 +104,6 @@ public class PasarelaDePrueba implements PasarelaPagos {
 			throw new PasarelaNoDisponibleException("Caída simulada");
 		}
 		devoluciones.add(referencia);
+		montosDevueltos.put(referencia, monto);
 	}
 }
