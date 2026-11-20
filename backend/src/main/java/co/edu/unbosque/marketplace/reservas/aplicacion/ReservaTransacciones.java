@@ -56,6 +56,7 @@ public class ReservaTransacciones {
 	private static final Logger log = LoggerFactory.getLogger(ReservaTransacciones.class);
 	private static final String NO_EXISTE = "La reserva no existe.";
 	private static final Duration PLAZO_DEVOLUCION = Duration.ofMinutes(2);
+	private static final String MODERADA_AL_PAGAR = "Alojamiento bloqueado o usuario restringido durante el pago";
 
 	private final ReservaRepository reservaRepository;
 	private final ClaveIdempotenciaRepository claveRepository;
@@ -65,6 +66,7 @@ public class ReservaTransacciones {
 	private final PeriodoReservadoRepository periodoReservadoRepository;
 	private final CotizacionService cotizacionService;
 	private final EventosReserva eventos;
+	private final RevisionReservasService revisionReservas;
 	private final ObjectMapper json;
 	private final Clock reloj;
 	private final Duration retencion;
@@ -73,7 +75,7 @@ public class ReservaTransacciones {
 			AlojamientoRepository alojamientoRepository, UsuarioRepository usuarioRepository,
 			PeriodoDisponibleRepository periodoDisponibleRepository,
 			PeriodoReservadoRepository periodoReservadoRepository, CotizacionService cotizacionService,
-			EventosReserva eventos, ObjectMapper json, Clock reloj,
+			EventosReserva eventos, RevisionReservasService revisionReservas, ObjectMapper json, Clock reloj,
 			@Value("${marketplace.reservas.retencion:PT10M}") Duration retencion) {
 		this.reservaRepository = reservaRepository;
 		this.claveRepository = claveRepository;
@@ -83,6 +85,7 @@ public class ReservaTransacciones {
 		this.periodoReservadoRepository = periodoReservadoRepository;
 		this.cotizacionService = cotizacionService;
 		this.eventos = eventos;
+		this.revisionReservas = revisionReservas;
 		this.json = json;
 		this.reloj = reloj;
 		this.retencion = retencion;
@@ -180,6 +183,11 @@ public class ReservaTransacciones {
 		reserva.confirmar(referenciaPago, ahora);
 		fechas.bloquearDefinitivamente();
 		eventos.publicar("RESERVA_CONFIRMADA", reserva);
+		if (enModeracion(reserva)) {
+			// Bloquearon el alojamiento o restringieron a alguien mientras se pagaba: igual que
+			// las demás reservas confirmadas, queda en revisión (MA-80, MA-81)
+			revisionReservas.ponerEnRevisionAlConfirmar(reserva, MODERADA_AL_PAGAR);
+		}
 		RespuestaReserva respuesta = new RespuestaReserva(HttpStatus.CREATED.value(),
 				json.writeValueAsString(ReservaDTO.desde(reserva)));
 		terminarClave(reservaId, respuesta, ahora);
@@ -321,6 +329,23 @@ public class ReservaTransacciones {
 	// ─────────────────────────────────────────
 	// Auxiliares
 	// ─────────────────────────────────────────
+
+	/**
+	 * Si el huésped o el anfitrión están restringidos o el alojamiento está bloqueado. Lee las
+	 * filas con bloqueo compartido: una moderación en curso termina antes, y una nueva espera a
+	 * que esta confirmación termine y entonces encuentra la reserva confirmada.
+	 * <p>
+	 * Primero los usuarios y después el alojamiento, el mismo orden en que los bloquea la
+	 * restricción de un usuario: así las dos transacciones no se esperan en círculo.
+	 */
+	private boolean enModeracion(Reserva reserva) {
+		Alojamiento alojamiento = reserva.getAlojamiento();
+		boolean restringido = usuarioRepository.estadosConBloqueoCompartido(
+				List.of(reserva.getHuesped().getId(), alojamiento.getAnfitrion().getId()))
+				.contains(Usuario.EstadoCuenta.RESTRINGIDA.name());
+		String estadoAlojamiento = alojamientoRepository.estadoConBloqueoCompartido(alojamiento.getId());
+		return restringido || EstadoAlojamiento.BLOQUEADA.name().equals(estadoAlojamiento);
+	}
 
 	private Reserva bloquear(Long reservaId) {
 		return reservaRepository.buscarParaActualizar(reservaId)

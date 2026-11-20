@@ -100,4 +100,36 @@ class AlojamientoTest {
 		assertThat(EstadoAlojamiento.PENDIENTE_REVISION.puedePasarA(EstadoAlojamiento.ACTIVA)).isTrue();
 		assertThat(EstadoAlojamiento.BORRADOR.puedePasarA(EstadoAlojamiento.ACTIVA)).isFalse();
 	}
+
+	// ─────────────────────────────────────────
+	// Moderación — MA-80
+	// ─────────────────────────────────────────
+
+	@Test
+	void elAdministradorLoBloqueaConMotivoYAlDesbloquearloQuedaPausada() {
+		alojamiento.enviarARevision(AHORA);
+		alojamiento.cambiarEstado(EstadoAlojamiento.ACTIVA, AHORA);
+
+		alojamiento.bloquear("  Fotos engañosas ", AHORA);
+		assertThat(alojamiento.getEstado()).isEqualTo(EstadoAlojamiento.BLOQUEADA);
+		assertThat(alojamiento.getMotivoBloqueo()).isEqualTo("Fotos engañosas");
+		assertThatThrownBy(() -> alojamiento.bloquear("Otra vez", AHORA)).isInstanceOf(ReglaNegocioException.class);
+
+		alojamiento.desbloquear(AHORA);
+		assertThat(alojamiento.getEstado()).isEqualTo(EstadoAlojamiento.PAUSADA);
+		assertThat(alojamiento.getMotivoBloqueo()).isNull();
+	}
+
+	@Test
+	void soloSeDesbloqueaUnAlojamientoBloqueado() {
+		assertThatThrownBy(() -> alojamiento.desbloquear(AHORA)).isInstanceOf(ReglaNegocioException.class);
+		alojamiento.enviarARevision(AHORA);
+		alojamiento.cambiarEstado(EstadoAlojamiento.ACTIVA, AHORA);
+
+		// ACTIVA → PAUSADA es una transición válida, pero no es un desbloqueo
+		assertThatThrownBy(() -> alojamiento.desbloquear(AHORA))
+				.isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "NO_BLOQUEADO");
+		assertThat(alojamiento.getEstado()).isEqualTo(EstadoAlojamiento.ACTIVA);
+	}
 }

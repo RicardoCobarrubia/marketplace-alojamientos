@@ -23,11 +23,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cache.CacheManager;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,7 +47,7 @@ import co.edu.unbosque.marketplace.usuarios.infraestructura.seguridad.JwtUtil;
  * Flujo de reserva contra PostgreSQL real (MA-66 a MA-69, MA-60), con una pasarela que permite
  * inyectar fallos. Requiere Docker en ejecución.
  */
-@Import({ TestcontainersConfiguration.class, ReservaIntegrationTest.Pasarela.class })
+@Import({ TestcontainersConfiguration.class, PasarelaDePruebaConfig.class })
 @SpringBootTest
 @ActiveProfiles("test")
 class ReservaIntegrationTest {
@@ -59,15 +56,6 @@ class ReservaIntegrationTest {
 	private static final LocalDate LLEGADA = HOY.plusDays(10);
 	private static final LocalDate SALIDA = HOY.plusDays(13);
 	private static final Pattern RESERVA_ID = Pattern.compile("\"reservaId\":(\\d+)");
-
-	@TestConfiguration
-	static class Pasarela {
-		@Bean
-		@Primary
-		PasarelaDePrueba pasarelaDePrueba() {
-			return new PasarelaDePrueba();
-		}
-	}
 
 	@Autowired
 	private WebApplicationContext contexto;

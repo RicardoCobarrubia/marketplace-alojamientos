@@ -40,6 +40,31 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long>, JpaSpec
 			order by r.creadoEn""")
 	List<Long> buscarPorEstadoCreadasAntesDe(@Param("estado") EstadoReserva estado, @Param("limite") Instant limite);
 
+	/**
+	 * Las reservas de un alojamiento en un estado con llegada desde {@code desde}, bloqueadas para
+	 * cambiarlas (MA-80).
+	 */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+			select r from Reserva r
+			where r.alojamiento.id = :alojamientoId and r.estado = :estado and r.fechaLlegada >= :desde
+			order by r.id""")
+	List<Reserva> bloquearDelAlojamientoDesde(@Param("alojamientoId") Long alojamientoId,
+			@Param("estado") EstadoReserva estado, @Param("desde") LocalDate desde);
+
+	/**
+	 * Las reservas de un usuario, como huésped o como anfitrión del alojamiento, en un estado con
+	 * llegada desde {@code desde}, bloqueadas para cambiarlas (MA-81).
+	 */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+			select r from Reserva r
+			where (r.huesped.id = :usuarioId or r.alojamiento.anfitrion.id = :usuarioId)
+			  and r.estado = :estado and r.fechaLlegada >= :desde
+			order by r.id""")
+	List<Reserva> bloquearDelUsuarioDesde(@Param("usuarioId") Long usuarioId, @Param("estado") EstadoReserva estado,
+			@Param("desde") LocalDate desde);
+
 	/** Reservas en un estado cuya fecha de salida ya llegó (MA-71, escenario 3). */
 	@Query("""
 			select r.id from Reserva r

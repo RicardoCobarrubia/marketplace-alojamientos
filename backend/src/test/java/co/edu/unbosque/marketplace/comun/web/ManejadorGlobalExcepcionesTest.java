@@ -1,6 +1,11 @@
 package co.edu.unbosque.marketplace.comun.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,12 +19,16 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.context.request.ServletWebRequest;
 
+import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
+import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
+import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 
 class ManejadorGlobalExcepcionesTest {
 
-	private final ManejadorGlobalExcepciones manejador = new ManejadorGlobalExcepciones();
+	private final Auditoria auditoria = mock(Auditoria.class);
+	private final ManejadorGlobalExcepciones manejador = new ManejadorGlobalExcepciones(auditoria);
 
 	@BeforeEach
 	void ponerIdDeCorrelacion() {
@@ -84,5 +93,15 @@ class ManejadorGlobalExcepcionesTest {
 		assertThat(respuesta.getStatusCode().value()).isEqualTo(400);
 		assertThat(respuesta.getBody()).isInstanceOfSatisfying(ProblemDetail.class, problema ->
 				assertThat(problema.getProperties()).containsEntry("correlationId", "peticion-1"));
+	}
+
+	@Test
+	void todoAccesoDenegadoQuedaAuditadoAunqueElRegistroFalle() {
+		manejador.manejarAccesoDenegado(new AccessDeniedException("denegado"));
+		manejador.manejarExcepcionDeNegocio(new AccesoDenegadoException("ajeno"));
+
+		verify(auditoria, times(2)).registrar(EventoAuditoria.accesoDenegado("desconocido"));
+		doThrow(new IllegalStateException("caída")).when(auditoria).registrar(any());
+		assertThat(manejador.manejarAccesoDenegado(new AccessDeniedException("denegado")).getStatus()).isEqualTo(403);
 	}
 }

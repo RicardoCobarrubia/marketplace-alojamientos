@@ -18,7 +18,17 @@ public interface AlojamientoRepository extends JpaRepository<Alojamiento, Long> 
 
 	List<Alojamiento> findByEstadoOrderByActualizadoEnAsc(EstadoAlojamiento estado);
 
+	/** Los alojamientos de un anfitrión en un estado, por ejemplo los ACTIVA al restringirlo (MA-81). */
+	List<Alojamiento> findByAnfitrionIdAndEstado(Long anfitrionId, EstadoAlojamiento estado);
+
 	List<Alojamiento> findAllByOrderByCreadoEnDesc();
+
+	/**
+	 * El estado actual del alojamiento, leído de la base de datos con bloqueo compartido: espera
+	 * a que termine un bloqueo en curso (MA-80) y le impide empezar hasta terminar la transacción.
+	 */
+	@Query(value = "SELECT estado FROM alojamiento WHERE id = :id FOR SHARE", nativeQuery = true)
+	String estadoConBloqueoCompartido(@Param("id") Long id);
 
 	/**
 	 * Bloquea la fila del alojamiento hasta terminar la transacción. Lo usan los cambios de
