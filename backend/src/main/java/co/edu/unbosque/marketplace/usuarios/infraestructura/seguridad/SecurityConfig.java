@@ -74,7 +74,7 @@ public class SecurityConfig {
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/catalogos/**").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/alojamientos/*/disponibilidad", "/api/alojamientos/*/periodos",
-						"/api/alojamientos/*/cotizacion")
+						"/api/alojamientos/*/cotizacion", "/api/alojamientos/*/resenas")
 					.permitAll()
 
 				// Administración — MA-49
