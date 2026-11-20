@@ -79,6 +79,7 @@ class ConciliadorReservasTest {
 		when(cancelaciones.devolucionesPendientes()).thenReturn(List.of(1L, 2L, 3L));
 		doThrow(new PasarelaNoDisponibleException("caída")).when(cancelaciones).devolver(1L);
 		doThrow(new IllegalStateException("falla")).when(cancelaciones).devolver(2L);
+		when(cancelaciones.devolver(3L)).thenReturn(true);
 
 		assertThat(new ConciliadorReservas(transacciones, reservaService, gestion, cancelaciones)
 				.reintentarDevoluciones()).isEqualTo(1);

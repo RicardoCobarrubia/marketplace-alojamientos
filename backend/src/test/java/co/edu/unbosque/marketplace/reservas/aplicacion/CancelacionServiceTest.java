@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,11 +57,10 @@ class CancelacionServiceTest {
 	}
 
 	private void conDevolucionPendiente() {
+		when(transacciones.reclamarDevolucion(50L)).thenReturn(OptionalInt.of(1));
 		when(transacciones.buscar(50L)).thenReturn(Optional.of(reserva));
-		when(reserva.isDevolucionPendiente()).thenReturn(true);
 		when(reserva.getReferenciaPago()).thenReturn("pi_1");
 		when(reserva.getValorDevolucion()).thenReturn(VALOR);
-		when(transacciones.siguienteIntentoDevolucion(50L)).thenReturn(1);
 	}
 
 	@Test
@@ -97,14 +97,23 @@ class CancelacionServiceTest {
 	}
 
 	@Test
-	void unReintentoDeUnaDevolucionYaHechaNoHaceNada() {
-		when(transacciones.buscar(50L)).thenReturn(Optional.of(reserva));
-		when(transacciones.buscar(51L)).thenReturn(Optional.empty());
+	void siOtraEjecucionYaLaReclamoOYaSeHizoNoLlamaALaPasarela() {
+		when(transacciones.reclamarDevolucion(50L)).thenReturn(OptionalInt.empty());
 
-		servicio.devolver(50L);
-		servicio.devolver(51L);
+		assertThat(servicio.devolver(50L)).isFalse();
 
 		verify(pasarela, never()).devolver(any(), any(), any(), anyInt());
+		verify(transacciones, never()).buscar(any());
+	}
+
+	@Test
+	void devolverPideLaDevolucionReclamadaYLaMarca() {
+		conDevolucionPendiente();
+
+		assertThat(servicio.devolver(50L)).isTrue();
+
+		verify(pasarela).devolver("pi_1", VALOR, "reserva-50-cancelacion", 1);
+		verify(transacciones).marcarDevolucionSolicitada(50L);
 	}
 
 	@Test

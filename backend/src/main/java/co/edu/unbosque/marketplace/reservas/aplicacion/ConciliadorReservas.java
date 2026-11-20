@@ -81,8 +81,9 @@ public class ConciliadorReservas {
 		int solicitadas = 0;
 		for (Long reservaId : cancelaciones.devolucionesPendientes()) {
 			try {
-				cancelaciones.devolver(reservaId);
-				solicitadas++;
+				if (cancelaciones.devolver(reservaId)) {
+					solicitadas++;
+				}
 			} catch (PasarelaNoDisponibleException e) {
 				log.warn("La pasarela sigue sin aceptar la devolución de la reserva {}", reservaId);
 			} catch (RuntimeException e) {

@@ -11,7 +11,9 @@ ALTER TABLE reserva
     -- Valor que se devuelve al cancelar (MA-74, escenario 1)
     ADD COLUMN valor_devolucion NUMERIC(12,2),
     -- La devolución ya se calculó pero la pasarela todavía no la aceptó: el conciliador la reintenta
-    ADD COLUMN devolucion_pendiente BOOLEAN NOT NULL DEFAULT false;
+    ADD COLUMN devolucion_pendiente BOOLEAN NOT NULL DEFAULT false,
+    -- Una ejecución está pidiendo la devolución a la pasarela hasta este momento: ninguna otra la pide
+    ADD COLUMN devolucion_reclamada_hasta TIMESTAMPTZ;
 
 UPDATE reserva r SET politica_cancelacion_codigo = p.codigo
 FROM politica_cancelacion p

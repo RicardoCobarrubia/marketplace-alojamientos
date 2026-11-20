@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -248,6 +249,26 @@ class ReservaTest {
 		reserva.devolucionSolicitada(AHORA.plusSeconds(5));
 		assertThat(reserva.isDevolucionPendiente()).isFalse();
 		assertThat(reserva.getActualizadoEn()).isEqualTo(AHORA.plusSeconds(5));
+	}
+
+	@Test
+	void soloUnaEjecucionALaVezReclamaLaDevolucionHastaQueVenceElPlazo() {
+		reserva.confirmar("pi_1", AHORA);
+		reserva.cancelar(2L, "Cambio de planes", DEVOLUCION, ANTES_DE_LLEGAR, AHORA);
+		Duration plazo = Duration.ofMinutes(2);
+
+		assertThat(reserva.reclamarDevolucion(AHORA, plazo)).hasValue(1);
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(60), plazo)).isEmpty();
+		// Si la primera falló o se cayó, el reclamo vence y se puede reintentar
+		assertThat(reserva.reclamarDevolucion(AHORA.plus(plazo), plazo)).hasValue(2);
+
+		reserva.devolucionSolicitada(AHORA.plusSeconds(200));
+		assertThat(reserva.reclamarDevolucion(AHORA.plusSeconds(500), plazo)).isEmpty();
+	}
+
+	@Test
+	void sinDevolucionPendienteNoHayNadaQueReclamar() {
+		assertThat(reserva.reclamarDevolucion(AHORA, Duration.ofMinutes(2))).isEmpty();
 	}
 
 	@Test

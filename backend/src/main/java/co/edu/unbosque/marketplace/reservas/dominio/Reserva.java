@@ -1,10 +1,12 @@
 package co.edu.unbosque.marketplace.reservas.dominio;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -156,6 +158,10 @@ public class Reserva {
 	@Column(name = "devolucion_pendiente", nullable = false)
 	private boolean devolucionPendiente;
 
+	/** Hasta cuándo una ejecución tiene reservada la solicitud de la devolución a la pasarela. */
+	@Column(name = "devolucion_reclamada_hasta")
+	private Instant devolucionReclamadaHasta;
+
 	@Column(name = "correlation_id", length = 100, updatable = false)
 	private String correlationId;
 
@@ -293,9 +299,27 @@ public class Reserva {
 		this.devolucionPendiente = devolucion.signum() > 0 && referenciaPago != null;
 	}
 
+	/**
+	 * Reserva para una sola ejecución la solicitud de la devolución pendiente durante
+	 * {@code plazo}: mientras tanto, otra ejecución (por ejemplo el conciliador) no la pide a la
+	 * vez y no se devuelve dos veces. Si la ejecución falla o se cae, el reclamo vence solo y la
+	 * devolución se puede reintentar.
+	 *
+	 * @return el número del intento, o vacío si no hay devolución pendiente o ya otra la reclamó
+	 */
+	public OptionalInt reclamarDevolucion(Instant ahora, Duration plazo) {
+		if (!devolucionPendiente || (devolucionReclamadaHasta != null && devolucionReclamadaHasta.isAfter(ahora))) {
+			return OptionalInt.empty();
+		}
+		this.devolucionReclamadaHasta = ahora.plus(plazo);
+		this.actualizadoEn = ahora;
+		return OptionalInt.of(++intentosDevolucion);
+	}
+
 	/** La pasarela aceptó la devolución de la cancelación (MA-73, escenario 2). */
 	public void devolucionSolicitada(Instant ahora) {
 		this.devolucionPendiente = false;
+		this.devolucionReclamadaHasta = null;
 		this.actualizadoEn = ahora;
 	}
 

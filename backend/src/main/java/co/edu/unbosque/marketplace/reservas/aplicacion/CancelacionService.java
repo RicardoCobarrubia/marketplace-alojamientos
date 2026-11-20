@@ -1,6 +1,7 @@
 package co.edu.unbosque.marketplace.reservas.aplicacion;
 
 import java.util.List;
+import java.util.OptionalInt;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,21 +59,27 @@ public class CancelacionService {
 	}
 
 	/**
-	 * Pide a la pasarela la devolución pendiente de una reserva cancelada. Cada intento usa su
-	 * propia clave y la pasarela solo devuelve lo que falta, así un reintento no devuelve dos
-	 * veces.
+	 * Pide a la pasarela la devolución pendiente de una reserva cancelada. Antes la reclama: si
+	 * otra ejecución la está pidiendo, no hace nada, así dos ejecuciones a la vez no devuelven dos
+	 * veces. Cada intento usa su propia clave y la pasarela solo devuelve lo que falta.
+	 * <p>
+	 * Si la pasarela falla, el reclamo no se suelta: vence solo, para no reintentar mientras la
+	 * petición anterior pueda seguir en curso en la pasarela.
 	 *
+	 * @return si se pidió la devolución
 	 * @throws PasarelaNoDisponibleException si la pasarela no la aceptó; sigue pendiente
 	 */
-	public void devolver(Long reservaId) {
-		Reserva reserva = transacciones.buscar(reservaId).orElse(null);
-		if (reserva == null || !reserva.isDevolucionPendiente()) {
-			return;
+	public boolean devolver(Long reservaId) {
+		OptionalInt intento = transacciones.reclamarDevolucion(reservaId);
+		if (intento.isEmpty()) {
+			return false;
 		}
-		int intento = transacciones.siguienteIntentoDevolucion(reservaId);
+		Reserva reserva = transacciones.buscar(reservaId)
+				.orElseThrow(() -> new IllegalStateException("La reserva " + reservaId + " no existe."));
 		pasarela.devolver(reserva.getReferenciaPago(), reserva.getValorDevolucion(),
-				"reserva-" + reservaId + "-cancelacion", intento);
+				"reserva-" + reservaId + "-cancelacion", intento.getAsInt());
 		transacciones.marcarDevolucionSolicitada(reservaId);
-		log.info("Devolución de {} solicitada para la reserva cancelada {}", reserva.getValorDevolucion(), reservaId);
+		log.info("Devolución solicitada para la reserva cancelada {}", reserva.getId());
+		return true;
 	}
 }

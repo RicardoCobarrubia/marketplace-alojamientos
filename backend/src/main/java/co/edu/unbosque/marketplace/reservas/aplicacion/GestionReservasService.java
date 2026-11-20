@@ -112,8 +112,7 @@ public class GestionReservasService {
 		datos.put("canceladaPor", usuario.getRol());
 		datos.put("valorDevolucion", reserva.getValorDevolucion());
 		eventos.publicar("RESERVA_CANCELADA", reserva, datos);
-		log.info("Reserva {} cancelada ({}); se devuelven {}", reservaId, usuario.getRol(),
-				reserva.getValorDevolucion());
+		log.info("Reserva {} cancelada", reserva.getId());
 		return ReservaDTO.desde(reserva);
 	}
 

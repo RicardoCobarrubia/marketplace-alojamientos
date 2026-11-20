@@ -10,6 +10,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -234,6 +240,38 @@ class GestionReservasIntegrationTest {
 	}
 
 	@Test
+	void dosEjecucionesSimultaneasPidenLaDevolucionUnaSolaVez() throws Exception {
+		long id = reservar(huesped, "r-1", LLEGADA, SALIDA);
+		pasarela.modo(Modo.CAIDA);
+		cancelar(huesped, id, "{\"motivo\":\"Cambio de planes\"}").andExpect(status().isOk());
+		jdbc.update("UPDATE reserva SET devolucion_reclamada_hasta = NULL WHERE id = ?", id);
+		pasarela.modo(Modo.APROBAR);
+
+		ExecutorService hilos = Executors.newFixedThreadPool(10);
+		CountDownLatch salida = new CountDownLatch(1);
+		List<Future<Integer>> resultados = new ArrayList<>();
+		try {
+			for (int i = 0; i < 10; i++) {
+				resultados.add(hilos.submit(() -> {
+					salida.await();
+					return conciliador.reintentarDevoluciones();
+				}));
+			}
+			salida.countDown();
+			int solicitadas = 0;
+			for (Future<Integer> resultado : resultados) {
+				solicitadas += resultado.get();
+			}
+			assertThat(solicitadas).isEqualTo(1);
+		} finally {
+			hilos.shutdownNow();
+		}
+		assertThat(pasarela.devoluciones()).isEqualTo(1);
+		assertThat(jdbc.queryForObject("SELECT intentos_devolucion FROM reserva WHERE id = ?", Integer.class, id))
+				.isEqualTo(2);
+	}
+
+	@Test
 	void siCancelaElAdministradorSeDevuelveElTotal() throws Exception {
 		long id = reservar(huesped, "r-1", HOY.plusDays(1), HOY.plusDays(3));
 
@@ -263,6 +301,9 @@ class GestionReservasIntegrationTest {
 		assertThat(conciliador.reintentarDevoluciones()).isZero();
 
 		pasarela.modo(Modo.APROBAR);
+		// El intento fallido sigue reclamado unos minutos por si la petición seguía en la pasarela
+		assertThat(conciliador.reintentarDevoluciones()).isZero();
+		jdbc.update("UPDATE reserva SET devolucion_reclamada_hasta = now() - interval '1 second' WHERE id = ?", id);
 		assertThat(conciliador.reintentarDevoluciones()).isEqualTo(1);
 
 		assertThat(pasarela.montoDevuelto(referencia(id))).isEqualByComparingTo("693000");
