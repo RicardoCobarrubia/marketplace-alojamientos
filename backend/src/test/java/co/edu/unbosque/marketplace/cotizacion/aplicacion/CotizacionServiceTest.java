@@ -142,6 +142,8 @@ class CotizacionServiceTest {
 	@Test
 	void elAdministradorCambiaLaConfiguracion() {
 		hayConfiguracion();
+		when(configuracionRepository.buscarParaActualizar(ConfiguracionCotizacion.ID_UNICO))
+				.thenReturn(Optional.of(configuracion));
 		Usuario administrador = TestDatos.usuario(9L, Rol.ADMINISTRADOR, "hash", "admin@correo.com");
 
 		ConfiguracionCotizacionDTO resultado = servicio.actualizarConfiguracion(administrador,

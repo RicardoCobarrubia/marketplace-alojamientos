@@ -74,9 +74,6 @@ class ModeracionIntegrationTest {
 	@BeforeEach
 	void preparar() throws Exception {
 		jdbc.execute("TRUNCATE TABLE evento_outbox RESTART IDENTITY");
-		// La auditoría no se puede vaciar: cada prueba solo mira los registros que ella crea
-		Long ultimo = jdbc.queryForObject("SELECT max(id) FROM auditoria", Long.class);
-		auditoriaDesde = ultimo == null ? 0 : ultimo;
 		api = new ApiDePrueba(contexto, jdbc, passwordEncoder, cacheManager);
 		pasarela.reiniciar();
 		anfitrion = api.registrarEIniciarSesion("anfitrion@correo.com", "ANFITRION");
@@ -86,6 +83,10 @@ class ModeracionIntegrationTest {
 		api.como(anfitrion, post("/api/alojamientos/" + alojamientoId + "/periodos")
 				.content("{\"fechaInicio\":\"%s\",\"fechaFin\":\"%s\"}".formatted(HOY, HOY.plusDays(60))))
 				.andExpect(status().isCreated());
+		// La auditoría no se puede vaciar: cada prueba solo mira los registros que ella crea,
+		// sin los del registro, el inicio de sesión y el alojamiento de arriba
+		Long ultimo = jdbc.queryForObject("SELECT max(id) FROM auditoria", Long.class);
+		auditoriaDesde = ultimo == null ? 0 : ultimo;
 	}
 
 	private ResultActions reservar(String token, String clave, LocalDate llegada, LocalDate salida) throws Exception {
@@ -227,7 +228,7 @@ class ModeracionIntegrationTest {
 		assertThat(estado("usuario", usuarioId("anfitrion@correo.com"))).isEqualTo("ACTIVA");
 		assertThat(auditados("accion = 'ACCESO_DENEGADO' AND resultado = 'RECHAZADO'")).isEqualTo(2);
 		assertThat(jdbc.queryForObject("SELECT detalle FROM auditoria WHERE id > ? AND actor_id = ?"
-				+ " AND actor_rol = 'HUESPED'", String.class, auditoriaDesde, huespedId))
+				+ " AND actor_rol = 'HUESPED' AND accion = 'ACCESO_DENEGADO'", String.class, auditoriaDesde, huespedId))
 				.startsWith("POST /api/admin/usuarios/");
 	}
 

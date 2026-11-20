@@ -64,11 +64,12 @@ class EventosReservaTest {
 	@Test
 	void elMotivoVaAlDetalleDeLaAuditoria() {
 		Reserva reserva = reservaConfirmada();
+		reserva.ponerEnRevision(AHORA);
 
 		eventos.publicar("RESERVA_EN_REVISION", reserva, EstadoReserva.CONFIRMADA, Map.of("motivo", "Bloqueo"));
 
 		verify(publicador).publicar(eq("RESERVA_EN_REVISION"), eq("RESERVA"), eq(50L), anyMap());
 		verify(auditoria).registrar(EventoAuditoria.cambio("RESERVA_EN_REVISION", "RESERVA", 50L,
-				EstadoReserva.CONFIRMADA, EstadoReserva.CONFIRMADA, "Bloqueo"));
+				EstadoReserva.CONFIRMADA, EstadoReserva.EN_REVISION, "Bloqueo"));
 	}
 }

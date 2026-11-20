@@ -139,6 +139,9 @@ class AuditoriaIntegrationTest {
 		api.como(huesped, get("/api/admin/auditoria")).andExpect(status().isForbidden());
 		api.como(administrador, get("/api/admin/auditoria").param("entidad", "RESERVA"))
 				.andExpect(status().isBadRequest());
+		api.como(administrador, get("/api/admin/auditoria").param("actorId", "1").param("accion", "INICIO_SESION"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.codigo").value("VARIOS_FILTROS"));
 	}
 
 	@Test

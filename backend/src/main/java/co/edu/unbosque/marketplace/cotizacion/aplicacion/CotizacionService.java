@@ -113,7 +113,8 @@ public class CotizacionService {
 
 	@Transactional
 	public ConfiguracionCotizacionDTO actualizarConfiguracion(Usuario administrador, ConfiguracionCotizacionDTO datos) {
-		ConfiguracionCotizacion configuracion = configuracionActual();
+		ConfiguracionCotizacion configuracion = configuracionRepository.buscarParaActualizar(ConfiguracionCotizacion.ID_UNICO)
+				.orElseThrow(CotizacionService::sinConfiguracion);
 		String anterior = resumen(ConfiguracionCotizacionDTO.desde(configuracion));
 		configuracion.actualizar(datos.porcentajeTarifaServicio(), datos.porcentajeDescuentoEstadiaLarga(),
 				datos.minimoNochesDescuento(), administrador.getId(), reloj.instant());
@@ -138,7 +139,11 @@ public class CotizacionService {
 
 	private ConfiguracionCotizacion configuracionActual() {
 		return configuracionRepository.findById(ConfiguracionCotizacion.ID_UNICO)
-				.orElseThrow(() -> new IllegalStateException("Falta la configuración de la cotización (migración V5)."));
+				.orElseThrow(CotizacionService::sinConfiguracion);
+	}
+
+	private static IllegalStateException sinConfiguracion() {
+		return new IllegalStateException("Falta la configuración de la cotización (migración V5).");
 	}
 
 	/** Solo servicios activos del mismo alojamiento (MA-64, escenario 3). */
