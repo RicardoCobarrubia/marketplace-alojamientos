@@ -13,7 +13,7 @@ Maven no hace falta instalarlo: el proyecto trae el wrapper (`mvnw` / `mvnw.cmd`
 
 Todo se ejecuta desde la carpeta `backend`.
 
-1. Crea tu archivo de variables: copia `.env.example` como `.env` y cambia `DB_PASSWORD`. Usa solo letras, números, `-` y `_`: Docker Compose interpreta el `$` y la base de datos y la API quedarían con claves distintas. Genera también tu propio `JWT_SECRET`; con el valor de ejemplo cualquiera podría firmar tokens.
+1. Crea tu archivo de variables: copia `.env.example` como `.env` y escribe una clave en `DB_PASSWORD`. Usa solo letras, números, `-` y `_`: Docker Compose interpreta el `$` y la base de datos y la API quedarían con claves distintas. Genera también tu propio `JWT_SECRET` (mínimo 32 caracteres); sin él la API no arranca. Para que los correos salgan por la cuenta de Gmail del proyecto, pide al equipo la contraseña de aplicación y ponla en `MAIL_PASSWORD`; sin ella, usa Mailpit como indica la plantilla.
 2. Levanta PostgreSQL y Mailpit:
    ```
    docker compose up -d
