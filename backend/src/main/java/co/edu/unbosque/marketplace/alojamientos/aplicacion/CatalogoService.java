@@ -81,7 +81,7 @@ public class CatalogoService {
 		}
 		Ciudad ciudad = ciudadRepository.save(new Ciudad(solicitud.nombre(), solicitud.departamento()));
 		log.info("Ciudad agregada al catálogo (ciudad {})", ciudad.getId());
-		auditarAlta("CREAR_CIUDAD", "CIUDAD", ciudad.getId().longValue(), ciudad.getNombre());
+		auditarAlta("CREAR_CIUDAD", "CIUDAD", ciudad.getId(), ciudad.getNombre());
 		return CiudadDTO.desde(ciudad);
 	}
 

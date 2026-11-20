@@ -187,7 +187,7 @@ public class AlojamientoService {
 		EstadoAlojamiento anterior = alojamiento.getEstado();
 		alojamiento.cambiarEstado(EstadoAlojamiento.ACTIVA, reloj.instant());
 		registrarCambioDeEstado(alojamiento, anterior, administrador);
-		publicador.publicar("ALOJAMIENTO_APROBADO", "ALOJAMIENTO", alojamientoId, datosDelEvento(alojamiento, null));
+		publicador.publicar("ALOJAMIENTO_APROBADO", ALOJAMIENTO, alojamientoId, datosDelEvento(alojamiento, null));
 		return AlojamientoDTO.desde(alojamiento);
 	}
 
@@ -199,7 +199,7 @@ public class AlojamientoService {
 		EstadoAlojamiento anterior = alojamiento.getEstado();
 		alojamiento.rechazar(motivo, reloj.instant());
 		registrarCambioDeEstado(alojamiento, anterior, administrador);
-		publicador.publicar("ALOJAMIENTO_RECHAZADO", "ALOJAMIENTO", alojamientoId,
+		publicador.publicar("ALOJAMIENTO_RECHAZADO", ALOJAMIENTO, alojamientoId,
 				datosDelEvento(alojamiento, alojamiento.getMotivoRechazo()));
 		return AlojamientoDTO.desde(alojamiento);
 	}
