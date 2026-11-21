@@ -72,6 +72,8 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login", "/api/auth/reactivacion")
 					.permitAll()
 				.requestMatchers("/actuator/health/**").permitAll()
+				// Lo lee Prometheus dentro de la red de Docker; Traefik no publica /actuator
+				.requestMatchers(HttpMethod.GET, "/actuator/prometheus").permitAll()
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/catalogos/**").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/alojamientos/*/disponibilidad", "/api/alojamientos/*/periodos",

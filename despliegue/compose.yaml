@@ -1,0 +1,163 @@
+# Despliegue del Marketplace con Docker Compose (MA-93, ADR-008, ADR-012).
+#
+#   Traefik ──► frontend (React servido por nginx)        en  /
+#           └─► backend × 2 réplicas sin estado            en  /api
+#                 └─► PostgreSQL
+#   Alloy (logs de los contenedores) ──► Loki ──┐
+#   Prometheus (métricas de backend y Traefik) ─┴──► Grafana
+#
+# Uso, desde la carpeta despliegue:  docker compose up -d --build
+# Las variables salen de despliegue/.env (copia .env.example; no se sube al repositorio).
+
+name: marketplace
+
+services:
+  # ─── Balanceador ─────────────────────────────────────────
+  traefik:
+    image: traefik:v3.6
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.metricas.address=:8082
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metricas
+      - --metrics.prometheus.addservicesLabels=true
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --accesslog=true
+      - --accesslog.format=json
+      - --log.level=INFO
+    ports:
+      - "${PUERTO_APP:-80}:80"
+      # Panel de Traefik: solo en este equipo
+      - "127.0.0.1:${PUERTO_TRAEFIK:-8081}:8080"
+    volumes:
+      # Traefik descubre los contenedores y sus réplicas leyendo Docker
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  # ─── Aplicación ──────────────────────────────────────────
+  backend:
+    build: ../backend
+    image: marketplace-backend
+    deploy:
+      # Dos réplicas idénticas: si una cae, Traefik la retira y la otra atiende (ADR-008)
+      replicas: ${REPLICAS_BACKEND:-2}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/marketplace
+      DB_USERNAME: ${DB_USERNAME:?Falta DB_USERNAME en despliegue/.env}
+      DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en despliegue/.env}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en despliegue/.env}
+      PAGOS_PROVEEDOR: ${PAGOS_PROVEEDOR:-simulado}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      # La aplicación y la API comparten dirección detrás de Traefik
+      CORS_ORIGENES: ${CORS_ORIGENES:-http://localhost}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-responder@inversioneslr.com}
+      CORREO_ACTIVO: ${CORREO_ACTIVO:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=PathPrefix(`/api`)
+      - traefik.http.routers.api.entrypoints=web
+      - traefik.http.routers.api.middlewares=reintento
+      - traefik.http.services.backend.loadbalancer.server.port=8080
+      # Traefik pregunta cada 5 s si la réplica está lista; si no responde, deja de enviarle tráfico
+      - traefik.http.services.backend.loadbalancer.healthcheck.path=/actuator/health/readiness
+      - traefik.http.services.backend.loadbalancer.healthcheck.interval=5s
+      - traefik.http.services.backend.loadbalancer.healthcheck.timeout=3s
+      # Si la réplica elegida no acepta la conexión, se intenta con la otra. Una reserva repetida
+      # no se duplica: la protege su Idempotency-Key (ADR-005)
+      - traefik.http.middlewares.reintento.retry.attempts=2
+      - traefik.http.middlewares.reintento.retry.initialinterval=100ms
+    restart: unless-stopped
+
+  frontend:
+    build: ../frontend
+    image: marketplace-frontend
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.web.rule=PathPrefix(`/`)
+      - traefik.http.routers.web.entrypoints=web
+      # La regla más general va al final: /api siempre gana
+      - traefik.http.routers.web.priority=1
+      - traefik.http.services.frontend.loadbalancer.server.port=80
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: marketplace
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d marketplace"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── Observabilidad ──────────────────────────────────────
+  loki:
+    image: grafana/loki:3.5.0
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - datos-loki:/loki
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.10.0
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Lee los logs de los contenedores
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - datos-prometheus:/prometheus
+    ports:
+      - "127.0.0.1:${PUERTO_PROMETHEUS:-9090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Falta GRAFANA_ADMIN_PASSWORD en despliegue/.env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - datos-grafana:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${PUERTO_GRAFANA:-3000}:3000"
+    depends_on:
+      - loki
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  datos-postgres:
+  datos-loki:
+  datos-prometheus:
+  datos-grafana:
