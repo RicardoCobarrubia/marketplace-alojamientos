@@ -32,3 +32,26 @@
   background: #f6dcd6;
   color: #9a3a2c;
 }
+
+/* ─── Estados de reserva ──────────────────────────────── */
+.etiqueta-reserva--confirmada {
+  background: #e3efdc;
+  color: #3f6b2f;
+}
+
+.etiqueta-reserva--completada {
+  background: #e1e8ee;
+  color: #3d5468;
+}
+
+.etiqueta-reserva--en_revision,
+.etiqueta-reserva--pendiente_pago {
+  background: #f8e8c8;
+  color: #8a5a12;
+}
+
+.etiqueta-reserva--cancelada,
+.etiqueta-reserva--pago_fallido {
+  background: #f6dcd6;
+  color: #9a3a2c;
+}

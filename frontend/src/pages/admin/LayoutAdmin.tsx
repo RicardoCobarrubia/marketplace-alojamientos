@@ -16,7 +16,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import { listarAlojamientosAdmin } from '../../api/admin';
+import { listarAlojamientosAdmin, listarReservasEnRevision } from '../../api/admin';
 import { useAuth } from '../../auth/useAuth';
 import { Logo } from '../../components/Logo';
 import { RUTAS } from '../../routes/rutas';
@@ -45,13 +45,17 @@ export default function LayoutAdmin() {
   const { usuario, cerrarSesion } = useAuth();
   const { pathname } = useLocation();
   const [pendientes, setPendientes] = useState<number | undefined>();
+  const [reservasEnRevision, setReservasEnRevision] = useState<number | undefined>();
 
-  // Se recalcula al navegar para que el contador baje después de aprobar o rechazar.
+  // Se recalculan al navegar para que los contadores bajen después de cada decisión.
   useEffect(() => {
     let activo = true;
     listarAlojamientosAdmin('PENDIENTE_REVISION')
       .then((lista) => activo && setPendientes(lista.length))
       .catch(() => activo && setPendientes(undefined));
+    listarReservasEnRevision()
+      .then((lista) => activo && setReservasEnRevision(lista.length))
+      .catch(() => activo && setReservasEnRevision(undefined));
     return () => {
       activo = false;
     };
@@ -63,11 +67,11 @@ export default function LayoutAdmin() {
     { etiqueta: 'Alojamientos', icono: House, ruta: RUTAS.adminAlojamientos },
     { etiqueta: 'Catálogos', icono: Tags, ruta: RUTAS.adminCatalogos },
     { etiqueta: 'Usuarios', icono: Users },
-    { etiqueta: 'Reservas en revisión', icono: TriangleAlert },
-    { etiqueta: 'Reseñas', icono: ClipboardList },
-    { etiqueta: 'Tarifas', icono: CreditCard },
+    { etiqueta: 'Reservas en revisión', icono: TriangleAlert, ruta: RUTAS.adminReservasRevision, contador: reservasEnRevision },
+    { etiqueta: 'Reseñas', icono: ClipboardList, ruta: RUTAS.adminResenas },
+    { etiqueta: 'Tarifas', icono: CreditCard, ruta: RUTAS.adminTarifas },
     { etiqueta: 'Reportes', icono: Download },
-    { etiqueta: 'Auditoría', icono: FileText },
+    { etiqueta: 'Auditoría', icono: FileText, ruta: RUTAS.adminAuditoria },
   ];
 
   return (

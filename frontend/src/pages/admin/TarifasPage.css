@@ -1,0 +1,39 @@
+.tarifas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.tarifas__pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.tarifas__pie .campo__ayuda {
+  margin: 0;
+}
+
+.tarifas__explicacion {
+  background: #faf6ef;
+}
+
+.tarifas__explicacion ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--color-texto-suave);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .tarifas {
+    grid-template-columns: 1fr;
+  }
+}

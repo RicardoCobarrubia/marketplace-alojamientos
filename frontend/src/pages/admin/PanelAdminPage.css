@@ -62,3 +62,103 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.panel__rango {
+  width: 100%;
+  max-width: 220px;
+}
+
+.panel__rango .campo {
+  margin: 0;
+}
+
+.panel__graficas {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.panel__pendientes {
+  display: grid;
+  gap: 8px;
+}
+
+.cargando--compacto {
+  padding: 16px;
+}
+
+/* ─── Barras horizontales ─────────────────────────────── */
+.barras {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.barras__fila {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.barras__etiqueta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barras__pista {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f1e9db;
+}
+
+.barras__relleno {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 999px;
+  background: var(--color-cafe);
+  transition: width 0.3s ease;
+}
+
+.barras__relleno--confirmada {
+  background: #5d8a4a;
+}
+
+.barras__relleno--completada {
+  background: #4f6b82;
+}
+
+.barras__relleno--cancelada {
+  background: #b5513f;
+}
+
+.barras__relleno--pago_fallido {
+  background: #8f3b2e;
+}
+
+.barras__relleno--en_revision,
+.barras__relleno--pendiente_pago {
+  background: #c8932f;
+}
+
+.barras__valor {
+  font-weight: 600;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .panel__graficas {
+    grid-template-columns: 1fr;
+  }
+
+  .barras__fila {
+    grid-template-columns: 110px minmax(0, 1fr) 32px;
+  }
+}

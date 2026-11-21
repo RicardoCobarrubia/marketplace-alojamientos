@@ -1,0 +1,83 @@
+/* Estilos compartidos de las páginas de moderación del administrador. */
+
+.moderacion__lista {
+  display: grid;
+  gap: 12px;
+}
+
+.moderacion__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.moderacion__titulo {
+  margin: 0 0 6px;
+  font-family: var(--fuente-texto);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.moderacion__detalle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.82rem;
+}
+
+.moderacion__total {
+  display: grid;
+  justify-items: end;
+  font-family: var(--fuente-titulos);
+  font-size: 1.15rem;
+}
+
+.moderacion__total .campo__ayuda {
+  margin: 0;
+  font-family: var(--fuente-texto);
+}
+
+.moderacion__contexto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+}
+
+.moderacion__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.moderacion__comentario {
+  margin: 10px 0 0;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.moderacion__motivo {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radio);
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+  font-size: 0.8rem;
+}
+
+.estrellas {
+  color: #c8932f;
+  letter-spacing: 1px;
+}
+
+.estrellas__vacia {
+  color: #e2d6c2;
+}
