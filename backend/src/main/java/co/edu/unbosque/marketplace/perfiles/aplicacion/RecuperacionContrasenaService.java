@@ -1,51 +1,50 @@
 package co.edu.unbosque.marketplace.perfiles.aplicacion;
 
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria.Resultado;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
-import co.edu.unbosque.marketplace.notificaciones.dominio.CorreoNoEnviadoException;
 import co.edu.unbosque.marketplace.notificaciones.dominio.EnvioCorreo;
+import co.edu.unbosque.marketplace.perfiles.aplicacion.EmisionCodigos.CodigoEmitido;
 import co.edu.unbosque.marketplace.perfiles.dominio.CodigoRecuperacion;
 import co.edu.unbosque.marketplace.perfiles.infraestructura.CodigoRecuperacionRepository;
 import co.edu.unbosque.marketplace.usuarios.aplicacion.SesionesEnCache;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
-import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
 import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 import jakarta.annotation.PreDestroy;
 
 /**
  * Recuperar la contraseña con un código de un solo uso enviado al correo (MA-50).
  * <p>
- * Nunca revela si un correo está registrado: la solicitud responde lo mismo exista o no, y el
- * correo se envía en otro hilo después de confirmar, así la respuesta tampoco tarda distinto. Una
- * cuenta restringida por un administrador no recibe código.
+ * Nunca revela si un correo está registrado: la solicitud responde lo mismo exista o no, y crear
+ * el código y enviarlo ocurre en otro hilo, así la respuesta tampoco tarda distinto. Al cambiar la
+ * contraseña, un correo inexistente o sin código vigente hace la misma comprobación costosa que
+ * uno con código.
  */
 @Service
 public class RecuperacionContrasenaService {
 
 	private static final Logger log = LoggerFactory.getLogger(RecuperacionContrasenaService.class);
 	private static final String USUARIO = "USUARIO";
+	private static final String CAMBIAR_CONTRASENA = "CAMBIAR_CONTRASENA";
 	private static final int MAXIMO_BYTES_CONTRASENA = 72;
-	/** Entre dos códigos del mismo usuario pasa al menos un minuto: nadie llena su buzón. */
-	static final long SEGUNDOS_ENTRE_CODIGOS = 60;
 
+	private final EmisionCodigos emision;
 	private final UsuarioRepository usuarios;
 	private final CodigoRecuperacionRepository codigos;
 	private final PasswordEncoder passwordEncoder;
@@ -53,12 +52,14 @@ public class RecuperacionContrasenaService {
 	private final SesionesEnCache sesiones;
 	private final Auditoria auditoria;
 	private final Clock reloj;
-	private final SecureRandom aleatorio = new SecureRandom();
+	/** Para comparar contra algo cuando no hay código: el tiempo no delata si la cuenta existe. */
+	private final String hashFicticio;
 	private final ExecutorService envios = Executors.newVirtualThreadPerTaskExecutor();
 
-	public RecuperacionContrasenaService(UsuarioRepository usuarios, CodigoRecuperacionRepository codigos,
-			PasswordEncoder passwordEncoder, EnvioCorreo correo, SesionesEnCache sesiones, Auditoria auditoria,
-			Clock reloj) {
+	public RecuperacionContrasenaService(EmisionCodigos emision, UsuarioRepository usuarios,
+			CodigoRecuperacionRepository codigos, PasswordEncoder passwordEncoder, EnvioCorreo correo,
+			SesionesEnCache sesiones, Auditoria auditoria, Clock reloj) {
+		this.emision = emision;
 		this.usuarios = usuarios;
 		this.codigos = codigos;
 		this.passwordEncoder = passwordEncoder;
@@ -66,6 +67,7 @@ public class RecuperacionContrasenaService {
 		this.sesiones = sesiones;
 		this.auditoria = auditoria;
 		this.reloj = reloj;
+		this.hashFicticio = passwordEncoder.encode("000000");
 	}
 
 	@PreDestroy
@@ -73,27 +75,24 @@ public class RecuperacionContrasenaService {
 		envios.close();
 	}
 
-	/** MA-50, escenario 1: un código de 6 dígitos que vale 15 minutos. */
-	@Transactional
+	/**
+	 * MA-50, escenario 1: responde de inmediato y en otro hilo crea un código de 6 dígitos que vale
+	 * 15 minutos y lo envía al correo. Los logs de ese hilo conservan el id de correlación.
+	 */
 	public void solicitar(String email) {
-		Optional<Usuario> registrado = usuarios.findByEmail(Usuario.normalizarEmail(email))
-				.flatMap(usuario -> usuarios.buscarParaActualizar(usuario.getId()));
-		if (registrado.isEmpty() || registrado.get().getEstadoCuenta() == EstadoCuenta.RESTRINGIDA) {
-			return;
-		}
-		Usuario usuario = registrado.get();
-		Instant ahora = reloj.instant();
-		boolean muyPronto = codigos.findFirstByUsuarioIdOrderByIdDesc(usuario.getId())
-				.filter(ultimo -> ultimo.getCreadoEn().plusSeconds(SEGUNDOS_ENTRE_CODIGOS).isAfter(ahora))
-				.isPresent();
-		if (muyPronto) {
-			return;
-		}
-		String codigo = "%06d".formatted(aleatorio.nextInt(1_000_000));
-		codigos.save(new CodigoRecuperacion(usuario.getId(), passwordEncoder.encode(codigo), ahora));
-		auditoria.registrar(EventoAuditoria.accion("SOLICITAR_RECUPERACION", USUARIO, usuario.getId(),
-				Resultado.EXITO, null).conActor(usuario.getId(), usuario.getRol()));
-		enviarAlConfirmar(usuario.getEmail(), codigo);
+		Map<String, String> contexto = MDC.getCopyOfContextMap();
+		envios.execute(() -> {
+			if (contexto != null) {
+				MDC.setContextMap(contexto);
+			}
+			try {
+				emision.emitir(email).ifPresent(this::enviar);
+			} catch (RuntimeException e) {
+				log.warn("No se pudo crear o enviar el código de recuperación", e);
+			} finally {
+				MDC.clear();
+			}
+		});
 	}
 
 	/**
@@ -107,22 +106,28 @@ public class RecuperacionContrasenaService {
 			throw new SolicitudInvalidaException("CONTRASENA_MUY_LARGA",
 					"La contraseña es demasiado larga; usa menos caracteres especiales.");
 		}
-		Usuario usuario = usuarios.findByEmail(Usuario.normalizarEmail(solicitud.email()))
-				.flatMap(encontrado -> usuarios.buscarParaActualizar(encontrado.getId()))
-				.orElseThrow(RecuperacionContrasenaService::codigoInvalido);
 		Instant ahora = reloj.instant();
-		CodigoRecuperacion codigo = codigos.findFirstByUsuarioIdOrderByIdDesc(usuario.getId())
-				.filter(ultimo -> ultimo.sirve(ahora))
-				.orElseThrow(RecuperacionContrasenaService::codigoInvalido);
-		if (!passwordEncoder.matches(solicitud.codigo(), codigo.getCodigoHash())) {
+		Optional<Usuario> registrado = usuarios.findByEmail(Usuario.normalizarEmail(solicitud.email()))
+				.flatMap(encontrado -> usuarios.buscarParaActualizar(encontrado.getId()));
+		Optional<CodigoRecuperacion> vigente = registrado
+				.flatMap(usuario -> codigos.findFirstByUsuarioIdOrderByIdDesc(usuario.getId()))
+				.filter(ultimo -> ultimo.sirve(ahora));
+		boolean coincide = passwordEncoder.matches(solicitud.codigo(),
+				vigente.map(CodigoRecuperacion::getCodigoHash).orElse(hashFicticio));
+		if (registrado.isEmpty() || vigente.isEmpty()) {
+			throw codigoInvalido();
+		}
+		Usuario usuario = registrado.get();
+		CodigoRecuperacion codigo = vigente.get();
+		if (!coincide) {
 			codigo.registrarIntentoFallido();
-			auditoria.registrar(EventoAuditoria.accion("CAMBIAR_CONTRASENA", USUARIO, usuario.getId(),
+			auditoria.registrar(EventoAuditoria.accion(CAMBIAR_CONTRASENA, USUARIO, usuario.getId(),
 					Resultado.RECHAZADO, "Código incorrecto").conActor(usuario.getId(), usuario.getRol()));
 			throw codigoInvalido();
 		}
 		codigo.usar(ahora);
 		usuario.cambiarContrasena(passwordEncoder.encode(solicitud.password()));
-		auditoria.registrar(EventoAuditoria.accion("CAMBIAR_CONTRASENA", USUARIO, usuario.getId(),
+		auditoria.registrar(EventoAuditoria.accion(CAMBIAR_CONTRASENA, USUARIO, usuario.getId(),
 				Resultado.EXITO, "Con código de recuperación").conActor(usuario.getId(), usuario.getRol()));
 		sesiones.olvidarAlConfirmar(usuario.getEmail());
 		log.info("Contraseña cambiada con código de recuperación (usuario {})", usuario.getId());
@@ -134,24 +139,10 @@ public class RecuperacionContrasenaService {
 				"El código no es válido o ya venció. Solicita uno nuevo.");
 	}
 
-	private void enviarAlConfirmar(String destinatario, String codigo) {
-		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-			@Override
-			public void afterCommit() {
-				envios.execute(() -> enviar(destinatario, codigo));
-			}
-		});
-	}
-
-	private void enviar(String destinatario, String codigo) {
-		try {
-			correo.enviar(destinatario, "Código para recuperar tu contraseña",
-					"Tu código para recuperar la contraseña en LR Alojamientos es " + codigo + ".\n\n"
-							+ "Vence en 15 minutos y sirve una sola vez. Si no lo pediste, ignora este correo:"
-							+ " tu contraseña no cambia.");
-		} catch (CorreoNoEnviadoException e) {
-			// Sin el código en el log; el usuario puede pedir otro en un minuto
-			log.warn("No se pudo enviar el código de recuperación", e);
-		}
+	private void enviar(CodigoEmitido emitido) {
+		correo.enviar(emitido.destinatario(), "Código para recuperar tu contraseña",
+				"Tu código para recuperar la contraseña en LR Alojamientos es " + emitido.codigo() + ".\n\n"
+						+ "Vence en 15 minutos y sirve una sola vez. Si no lo pediste, ignora este correo:"
+						+ " tu contraseña no cambia.");
 	}
 }

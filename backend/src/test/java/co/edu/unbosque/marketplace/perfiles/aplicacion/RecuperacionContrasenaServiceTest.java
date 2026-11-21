@@ -25,14 +25,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.notificaciones.dominio.CorreoNoEnviadoException;
 import co.edu.unbosque.marketplace.notificaciones.dominio.EnvioCorreo;
+import co.edu.unbosque.marketplace.perfiles.aplicacion.EmisionCodigos.CodigoEmitido;
 import co.edu.unbosque.marketplace.perfiles.dominio.CodigoRecuperacion;
 import co.edu.unbosque.marketplace.perfiles.infraestructura.CodigoRecuperacionRepository;
 import co.edu.unbosque.marketplace.usuarios.aplicacion.SesionesEnCache;
@@ -45,6 +44,8 @@ class RecuperacionContrasenaServiceTest {
 
 	private static final String CORREO = "ana@correo.com";
 
+	@Mock
+	private EmisionCodigos emision;
 	@Mock
 	private UsuarioRepository usuarios;
 	@Mock
@@ -62,25 +63,19 @@ class RecuperacionContrasenaServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new RecuperacionContrasenaService(usuarios, codigos, passwordEncoder, correo, sesiones, auditoria,
-				Clock.fixed(AHORA, ZoneOffset.UTC));
+		servicio = new RecuperacionContrasenaService(emision, usuarios, codigos, passwordEncoder, correo, sesiones,
+				auditoria, Clock.fixed(AHORA, ZoneOffset.UTC));
 		usuario = TestDatos.usuario(3L, Rol.HUESPED, passwordEncoder.encode("clave-vieja-1"));
-		TransactionSynchronizationManager.initSynchronization();
 	}
 
 	@AfterEach
 	void limpiar() {
-		TransactionSynchronizationManager.clearSynchronization();
 		servicio.detener();
 	}
 
 	private void existe() {
 		when(usuarios.findByEmail(CORREO)).thenReturn(Optional.of(usuario));
 		when(usuarios.buscarParaActualizar(3L)).thenReturn(Optional.of(usuario));
-	}
-
-	private static void confirmarTransaccion() {
-		TransactionSynchronizationUtils.invokeAfterCommit(TransactionSynchronizationManager.getSynchronizations());
 	}
 
 	private CodigoRecuperacion codigoGuardado(String codigo) {
@@ -92,58 +87,26 @@ class RecuperacionContrasenaServiceTest {
 	// ─────────────────────────────────────────
 
 	@Test
-	void guardaSoloElHashYEnviaElCodigoDespuesDeConfirmar() {
-		existe();
+	void creaYEnviaElCodigoFueraDeLaPeticion() {
+		when(emision.emitir(CORREO)).thenReturn(Optional.of(new CodigoEmitido(CORREO, "123456")));
 
-		servicio.solicitar(" Ana@Correo.com ");
-
-		ArgumentCaptor<CodigoRecuperacion> guardado = ArgumentCaptor.forClass(CodigoRecuperacion.class);
-		verify(codigos).save(guardado.capture());
-		verify(correo, never()).enviar(anyString(), anyString(), anyString());
-
-		confirmarTransaccion();
+		servicio.solicitar(CORREO);
 
 		ArgumentCaptor<String> cuerpo = ArgumentCaptor.forClass(String.class);
 		verify(correo, timeout(2000)).enviar(eq(CORREO), anyString(), cuerpo.capture());
-		String codigo = cuerpo.getValue().replaceAll("(?s).*es (\\d{6})\\..*", "$1");
-		assertThat(codigo).matches("\\d{6}");
-		assertThat(guardado.getValue().getCodigoHash()).doesNotContain(codigo);
-		assertThat(passwordEncoder.matches(codigo, guardado.getValue().getCodigoHash())).isTrue();
-		assertThat(guardado.getValue().getVenceEn()).isEqualTo(AHORA.plus(CodigoRecuperacion.VIGENCIA));
+		assertThat(cuerpo.getValue()).contains("123456").contains("15 minutos");
 	}
 
 	@Test
-	void unCorreoQueNoExisteOUnaCuentaRestringidaNoRecibenCodigo() {
-		when(usuarios.findByEmail("nadie@correo.com")).thenReturn(Optional.empty());
+	void sinCodigoNoEnviaNadaYUnCorreoCaidoNoRompeNada() {
+		when(emision.emitir("nadie@correo.com")).thenReturn(Optional.empty());
 		servicio.solicitar("nadie@correo.com");
+		verify(emision, timeout(2000)).emitir("nadie@correo.com");
 
-		usuario.restringir("Fraude");
-		existe();
-		servicio.solicitar(CORREO);
-
-		verify(codigos, never()).save(any());
-	}
-
-	@Test
-	void noCreaOtroCodigoAntesDeUnMinuto() {
-		existe();
-		when(codigos.findFirstByUsuarioIdOrderByIdDesc(3L))
-				.thenReturn(Optional.of(new CodigoRecuperacion(3L, "hash", AHORA.minusSeconds(30))));
-
-		servicio.solicitar(CORREO);
-
-		verify(codigos, never()).save(any());
-	}
-
-	@Test
-	void siElCorreoFallaNoRompeNada() {
-		existe();
+		when(emision.emitir(CORREO)).thenReturn(Optional.of(new CodigoEmitido(CORREO, "123456")));
 		doThrow(new CorreoNoEnviadoException("caído", null)).when(correo).enviar(anyString(), anyString(),
 				anyString());
-
 		servicio.solicitar(CORREO);
-		confirmarTransaccion();
-
 		verify(correo, timeout(2000)).enviar(eq(CORREO), anyString(), anyString());
 	}
 
@@ -184,7 +147,24 @@ class RecuperacionContrasenaServiceTest {
 	}
 
 	@Test
-	void unCodigoUsadoVencidoOSinCuentaSeRechazanIgual() {
+	void conLosIntentosAgotadosNiElCodigoCorrectoSirve() {
+		existe();
+		CodigoRecuperacion codigo = codigoGuardado("123456");
+		for (int i = 0; i < CodigoRecuperacion.INTENTOS_MAXIMOS; i++) {
+			codigo.registrarIntentoFallido();
+		}
+		when(codigos.findFirstByUsuarioIdOrderByIdDesc(3L)).thenReturn(Optional.of(codigo));
+		String anterior = usuario.getPassword();
+		NuevaContrasenaDTO correcta = new NuevaContrasenaDTO(CORREO, "123456", "clave-nueva-1");
+
+		assertThatThrownBy(() -> servicio.cambiarContrasena(correcta))
+				.hasFieldOrPropertyWithValue("codigo", "CODIGO_INVALIDO");
+		assertThat(usuario.getPassword()).isEqualTo(anterior);
+		assertThat(codigo.getUsadoEn()).isNull();
+	}
+
+	@Test
+	void unCodigoUsadoOSinCuentaSeRechazanIgual() {
 		existe();
 		CodigoRecuperacion usado = codigoGuardado("123456");
 		usado.usar(AHORA.minusSeconds(60));
