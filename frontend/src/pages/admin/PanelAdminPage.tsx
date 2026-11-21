@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight, CircleAlert, Download, ListChecks, LoaderCircle, TriangleAlert } from 'lucide-react';
+import { ChevronRight, CircleAlert, ListChecks, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { listarAlojamientosAdmin, obtenerIndicadores, obtenerIngresos } from '../../api/admin';
 import { mensajeParaUsuario } from '../../api/mensajes';
 import { CampoSeleccion } from '../../components/CampoSeleccion';
@@ -103,6 +104,13 @@ export default function PanelAdminPage() {
             <Download size={16} aria-hidden="true" />
             Exportar reportes
           </Link>
+        <div className="panel__rango">
+          <CampoSeleccion
+            etiqueta="Periodo de ingresos"
+            opciones={RANGOS.map((r) => ({ valor: r.dias, etiqueta: r.etiqueta }))}
+            value={dias}
+            onChange={(e) => setDias(Number(e.target.value))}
+          />
         </div>
       </div>
 
