@@ -439,7 +439,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{servicio=\"backend\"} |~ \"\\\"log.level\\\":\\\"(WARN|ERROR)\\\"\""
+          "expr": "{servicio=\"backend\"} | json | log_level=~\"WARN|ERROR\""
         }
       ],
       "options": {
@@ -447,7 +447,8 @@
         "wrapLogMessage": true,
         "sortOrder": "Descending",
         "enableLogDetails": true
-      }
+      },
+      "description": "Los logs JSON del backend con nivel WARN o ERROR, de cualquier réplica."
     }
   ]
 }
