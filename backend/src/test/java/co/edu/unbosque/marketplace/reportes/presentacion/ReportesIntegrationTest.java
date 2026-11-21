@@ -134,12 +134,13 @@ class ReportesIntegrationTest {
 
 			// MA-85, escenario 2: las cifras coinciden con el panel
 			Map<String, Double> resumen = resumen(libro.getSheet("Resumen"));
-			assertThat(resumen.get("Usuarios")).isEqualTo(indicadores.get("usuarios").asDouble());
-			assertThat(resumen.get("Alojamientos activos")).isEqualTo(indicadores.get("alojamientosActivos").asDouble());
-			assertThat(resumen.get("Reservas CONFIRMADA"))
-					.isEqualTo(indicadores.get("reservasPorEstado").get("CONFIRMADA").asDouble());
-			assertThat(resumen.get("Ingresos estimados del período"))
-					.isEqualTo(ingresos.get("ingresosEstimados").asDouble()).isPositive();
+			assertThat(resumen)
+					.containsEntry("Usuarios", indicadores.get("usuarios").asDouble())
+					.containsEntry("Alojamientos activos", indicadores.get("alojamientosActivos").asDouble())
+					.containsEntry("Reservas CONFIRMADA",
+							indicadores.get("reservasPorEstado").get("CONFIRMADA").asDouble())
+					.containsEntry("Ingresos estimados del período", ingresos.get("ingresosEstimados").asDouble());
+			assertThat(ingresos.get("ingresosEstimados").asDouble()).isPositive();
 			assertThat(demanda.getRow(1).getCell(4).getNumericCellValue())
 					.isEqualTo(ingresos.get("ingresosEstimados").asDouble());
 		}
@@ -180,5 +181,9 @@ class ReportesIntegrationTest {
 
 		assertThat(jdbc.queryForObject("SELECT count(*) FROM auditoria WHERE id > ? AND accion = 'EXPORTAR_REPORTE'",
 				Integer.class, auditoriaDesde)).isZero();
+		// Los intentos de otros roles quedan como accesos denegados, cada uno con su actor
+		assertThat(jdbc.queryForList("SELECT actor_rol FROM auditoria WHERE id > ? AND accion = 'ACCESO_DENEGADO'"
+				+ " AND resultado = 'RECHAZADO' AND detalle = 'GET " + RUTA + "' ORDER BY id", String.class,
+				auditoriaDesde)).containsExactly("HUESPED", "ANFITRION");
 	}
 }

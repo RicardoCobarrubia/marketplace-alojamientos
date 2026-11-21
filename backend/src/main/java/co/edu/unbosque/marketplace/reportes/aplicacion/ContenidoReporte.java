@@ -23,12 +23,15 @@ import co.edu.unbosque.marketplace.reportes.infraestructura.ConsultasReporteRepo
 
 /**
  * Arma el contenido del reporte de gestión (MA-85, escenario 1). Los totales salen del mismo
- * servicio que el panel, así el reporte y el panel coinciden (escenario 2). Todo se lee de una
- * misma foto de la base de datos.
+ * servicio que el panel, así el reporte y el panel coinciden (escenario 2). Las secciones se leen
+ * de una misma foto de la base de datos.
  */
 @Service
 public class ContenidoReporte {
 
+	private static final String RESERVAS = "Reservas";
+	private static final String ESTADO = "Estado";
+	private static final String CIUDAD = "Ciudad";
 	private static final DateTimeFormatter FECHA_Y_HORA = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
 	private final PanelService panel;
@@ -67,8 +70,8 @@ public class ContenidoReporte {
 		filas.add(fila("Usuarios", indicadores.usuarios()));
 		agregar(filas, "Usuarios ", indicadores.usuariosPorRol());
 		filas.add(fila("Alojamientos activos", indicadores.alojamientosActivos()));
-		filas.add(fila("Reservas", indicadores.reservas()));
-		agregar(filas, "Reservas ", indicadores.reservasPorEstado());
+		filas.add(fila(RESERVAS, indicadores.reservas()));
+		agregar(filas, RESERVAS + " ", indicadores.reservasPorEstado());
 		filas.add(fila("Ingresos estimados del período", ingresos.ingresosEstimados()));
 		filas.add(fila("Reservas confirmadas y completadas del período", ingresos.reservas()));
 		return new Seccion("Resumen", List.of("Indicador", "Valor"), filas);
@@ -79,7 +82,7 @@ public class ContenidoReporte {
 				.stream()
 				.map(u -> fila(u.getId(), u.getNombre(), u.getEmail(), u.getRol(), u.getEstado(), u.getCreadoEn()))
 				.toList();
-		return new Seccion("Usuarios registrados", List.of("Id", "Nombre", "Correo", "Rol", "Estado", "Registrado"),
+		return new Seccion("Usuarios registrados", List.of("Id", "Nombre", "Correo", "Rol", ESTADO, "Registrado"),
 				filas);
 	}
 
@@ -89,8 +92,8 @@ public class ContenidoReporte {
 				.map(a -> fila(a.getId(), a.getTitulo(), a.getCiudad(), a.getTipo(), a.getAnfitrionId(), a.getEstado(),
 						a.getPrecioNoche(), a.getCreadoEn()))
 				.toList();
-		return new Seccion("Alojamientos creados", List.of("Id", "Título", "Ciudad", "Tipo", "Anfitrión",
-				"Estado", "Precio por noche", "Creado"), filas);
+		return new Seccion("Alojamientos creados", List.of("Id", "Título", CIUDAD, "Tipo", "Anfitrión",
+				ESTADO, "Precio por noche", "Creado"), filas);
 	}
 
 	private Seccion reservas(Periodo periodo, String zona) {
@@ -99,8 +102,8 @@ public class ContenidoReporte {
 				.map(r -> fila(r.getId(), r.getAlojamientoId(), r.getCiudad(), r.getHuespedId(), r.getLlegada(),
 						r.getSalida(), r.getEstado(), r.getTotal(), r.getTarifaServicio(), r.getCreadoEn()))
 				.toList();
-		return new Seccion("Reservas", List.of("Id", "Alojamiento", "Ciudad", "Huésped", "Llegada", "Salida",
-				"Estado", "Total", "Tarifa de servicio", "Creada"), filas);
+		return new Seccion(RESERVAS, List.of("Id", "Alojamiento", CIUDAD, "Huésped", "Llegada", "Salida",
+				ESTADO, "Total", "Tarifa de servicio", "Creada"), filas);
 	}
 
 	/** Las reservas que suman ingresos, por ciudad y tipo de alojamiento. */
@@ -110,7 +113,7 @@ public class ContenidoReporte {
 				.stream()
 				.map(d -> fila(d.getCiudad(), d.getDepartamento(), d.getTipo(), d.getReservas(), d.getIngresos()))
 				.toList();
-		return new Seccion("Demanda por ciudad y tipo", List.of("Ciudad", "Departamento", "Tipo", "Reservas",
+		return new Seccion("Demanda por ciudad y tipo", List.of(CIUDAD, "Departamento", "Tipo", RESERVAS,
 				"Ingresos estimados"), filas);
 	}
 

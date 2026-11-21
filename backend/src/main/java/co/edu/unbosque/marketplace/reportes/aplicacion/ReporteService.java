@@ -5,8 +5,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
@@ -21,7 +19,8 @@ import co.edu.unbosque.marketplace.reportes.dominio.Reporte;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 
 /**
- * Exporta el reporte de gestión (MA-85) y deja constancia de quién lo pidió y cuándo (MA-86).
+ * Exporta el reporte de gestión (MA-85) y deja constancia de quién lo pidió y cuándo (MA-86). La
+ * constancia es el registro de auditoría: no se repite en el log.
  * <p>
  * No es transaccional a propósito: la solicitud se guarda en la auditoría y se confirma antes de
  * generar el archivo. Si la generación falla o se interrumpe, el registro de la solicitud ya
@@ -30,7 +29,6 @@ import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 @Service
 public class ReporteService {
 
-	private static final Logger log = LoggerFactory.getLogger(ReporteService.class);
 	static final String ACCION = "EXPORTAR_REPORTE";
 	private static final String ENTIDAD = "REPORTE";
 	private static final String SOLICITADO = "SOLICITADO";
@@ -65,7 +63,6 @@ public class ReporteService {
 			byte[] archivo = generadores.get(formato).generar(reporte);
 			registrar(administrador, SOLICITADO, "GENERADO", Resultado.EXITO, solicitud + ", " + archivo.length
 					+ " bytes");
-			log.info("Reporte exportado (usuario {}, {}, {} bytes)", administrador.getId(), formato, archivo.length);
 			String nombre = "reporte-gestion-" + periodo.desde() + "-a-" + periodo.hasta() + "." + formato.extension();
 			return new ArchivoReporte(nombre, formato, archivo);
 		} catch (RuntimeException e) {
