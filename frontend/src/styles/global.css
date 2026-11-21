@@ -429,3 +429,22 @@ a {
 .estado-vacio p {
   margin: 0 0 20px;
 }
+
+/* ─── Formulario de motivo (moderación) ───────────────── */
+.formulario-motivo {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-error-borde);
+  border-radius: var(--radio);
+  background: #fdf7f5;
+}
+
+.formulario-motivo .campo {
+  margin-bottom: 10px;
+}
+
+.formulario-motivo__botones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

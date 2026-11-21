@@ -11,6 +11,7 @@ import { Miniatura } from '../../components/Miniatura';
 import { RUTAS } from '../../routes/rutas';
 import { NOMBRE_MODALIDAD, type Alojamiento } from '../../types/alojamiento';
 import { aIso, formatearFecha, formatearHace, formatearPrecio } from '../../utils/formato';
+import { ModeracionAlojamiento } from './ModeracionAlojamiento';
 import './DetallePublicacionPage.css';
 
 const MAXIMO_MOTIVO = 500;
@@ -302,6 +303,8 @@ export default function DetallePublicacionPage() {
               )}
             </p>
           )}
+
+          {!rechazando && <ModeracionAlojamiento alojamiento={a} alCambiar={setAlojamiento} />}
         </aside>
       </div>
     </>

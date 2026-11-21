@@ -172,3 +172,19 @@
     height: 220px;
   }
 }
+
+.detalle__moderacion {
+  padding-top: 16px;
+  border-top: 1px solid var(--color-borde);
+}
+
+.detalle__moderacion-titulo {
+  margin: 0 0 10px;
+  font-family: var(--fuente-texto);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.detalle__moderacion .alerta {
+  margin-bottom: 10px;
+}

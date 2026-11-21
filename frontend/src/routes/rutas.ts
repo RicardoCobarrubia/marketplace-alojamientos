@@ -13,6 +13,10 @@ export const RUTAS = {
   adminPublicaciones: '/admin/publicaciones',
   adminAlojamientos: '/admin/alojamientos',
   adminCatalogos: '/admin/catalogos',
+  adminReservasRevision: '/admin/reservas-en-revision',
+  adminResenas: '/admin/resenas',
+  adminTarifas: '/admin/tarifas',
+  adminAuditoria: '/admin/auditoria',
 } as const;
 
 export function rutaEditarAlojamiento(id: number): string {

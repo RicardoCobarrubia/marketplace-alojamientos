@@ -1,11 +1,15 @@
 import { Navigate, Route, Routes } from 'react-router';
 import { LayoutApp } from './components/LayoutApp';
 import AlojamientosAdminPage from './pages/admin/AlojamientosAdminPage';
+import AuditoriaPage from './pages/admin/AuditoriaPage';
 import CatalogosPage from './pages/admin/CatalogosPage';
 import DetallePublicacionPage from './pages/admin/DetallePublicacionPage';
 import LayoutAdmin from './pages/admin/LayoutAdmin';
 import PanelAdminPage from './pages/admin/PanelAdminPage';
+import ResenasAdminPage from './pages/admin/ResenasAdminPage';
+import ReservasRevisionPage from './pages/admin/ReservasRevisionPage';
 import RevisionPublicacionesPage from './pages/admin/RevisionPublicacionesPage';
+import TarifasPage from './pages/admin/TarifasPage';
 import DisponibilidadPage from './pages/anfitrion/disponibilidad/DisponibilidadPage';
 import FormularioAlojamientoPage from './pages/anfitrion/formulario/FormularioAlojamientoPage';
 import LayoutAnfitrion from './pages/anfitrion/LayoutAnfitrion';
@@ -52,6 +56,10 @@ export default function App() {
           <Route path="publicaciones/:id" element={<DetallePublicacionPage />} />
           <Route path="alojamientos" element={<AlojamientosAdminPage />} />
           <Route path="catalogos" element={<CatalogosPage />} />
+          <Route path="reservas-en-revision" element={<ReservasRevisionPage />} />
+          <Route path="resenas" element={<ResenasAdminPage />} />
+          <Route path="tarifas" element={<TarifasPage />} />
+          <Route path="auditoria" element={<AuditoriaPage />} />
         </Route>
       </Route>
 
