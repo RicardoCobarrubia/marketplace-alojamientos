@@ -69,7 +69,8 @@ public class SecurityConfig {
 				.accessDeniedHandler(respuestas))
 			.authorizeHttpRequests(auth -> auth
 				// Públicas
-				.requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login", "/api/auth/reactivacion")
+					.permitAll()
 				.requestMatchers("/actuator/health/**").permitAll()
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/catalogos/**").permitAll()

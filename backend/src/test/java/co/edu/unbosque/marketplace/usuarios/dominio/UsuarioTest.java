@@ -104,4 +104,68 @@ class UsuarioTest {
 		assertThat(usuario.getMotivoRestriccion()).isNull();
 		assertThatThrownBy(usuario::levantarRestriccion).isInstanceOf(ReglaNegocioException.class);
 	}
+
+	// ─────────────────────────────────────────
+	// Perfil y estado de la cuenta — MA-51, MA-52
+	// ─────────────────────────────────────────
+
+	@Test
+	void elPerfilSoloCambiaNombreYTelefono() {
+		Usuario usuario = TestDatos.usuario(1L, Rol.HUESPED, "hash");
+
+		usuario.actualizarPerfil("  Ana María  ", " 3109876543 ");
+
+		assertThat(usuario.getNombre()).isEqualTo("Ana María");
+		assertThat(usuario.getTelefono()).isEqualTo("3109876543");
+		assertThat(usuario.getEmail()).isEqualTo("ana@correo.com");
+		assertThat(usuario.getRol()).isEqualTo(Rol.HUESPED);
+	}
+
+	@Test
+	void alDesactivarlaSusTokensDejanDeValerYSoloSePuedeReactivar() {
+		Usuario usuario = TestDatos.usuario(1L, Rol.ANFITRION, "hash");
+		int version = usuario.getVersionSesion();
+		assertThatThrownBy(usuario::reactivar).isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "CUENTA_NO_DESACTIVADA");
+
+		usuario.desactivar();
+
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.DESACTIVADA);
+		assertThat(usuario.getVersionSesion()).isEqualTo(version + 1);
+		assertThat(usuario.isEnabled()).isFalse();
+		assertThat(usuario.estaActiva()).isFalse();
+		assertThatThrownBy(usuario::desactivar).isInstanceOf(ReglaNegocioException.class)
+				.hasFieldOrPropertyWithValue("codigo", "CUENTA_NO_ACTIVA");
+
+		usuario.reactivar();
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.ACTIVA);
+		assertThat(usuario.getVersionSesion()).isEqualTo(version + 1);
+	}
+
+	@Test
+	void siEstabaDesactivadaAlLevantarLaRestriccionSigueDesactivada() {
+		Usuario usuario = TestDatos.usuario(1L, Rol.HUESPED, "hash");
+		usuario.desactivar();
+		usuario.restringir("Fraude");
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.RESTRINGIDA);
+
+		usuario.levantarRestriccion();
+
+		// Solo su dueño la reactiva, confirmando con sus credenciales
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.DESACTIVADA);
+		usuario.reactivar();
+		usuario.restringir("Otra vez");
+		usuario.levantarRestriccion();
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.ACTIVA);
+	}
+
+	@Test
+	void unaCuentaRestringidaNoSeDesactivaNiSeReactiva() {
+		Usuario usuario = TestDatos.usuario(1L, Rol.HUESPED, "hash");
+		usuario.restringir("Fraude");
+
+		assertThatThrownBy(usuario::desactivar).isInstanceOf(ReglaNegocioException.class);
+		assertThatThrownBy(usuario::reactivar).isInstanceOf(ReglaNegocioException.class);
+		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.RESTRINGIDA);
+	}
 }

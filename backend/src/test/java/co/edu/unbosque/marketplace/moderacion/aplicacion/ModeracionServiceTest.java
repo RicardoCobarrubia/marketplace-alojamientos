@@ -146,6 +146,19 @@ class ModeracionServiceTest {
 	}
 
 	@Test
+	void siSuDuenoLaHabiaDesactivadoAlLevantarLaRestriccionSigueDesactivada() {
+		anfitrion.desactivar();
+		anfitrion.restringir("Fraude");
+		when(usuarioRepository.buscarParaActualizar(1L)).thenReturn(Optional.of(anfitrion));
+		when(cacheManager.getCache(CacheConfig.VERSIONES_SESION)).thenReturn(null);
+
+		assertThat(servicio.levantarRestriccion(1L).estado()).isEqualTo("DESACTIVADA");
+		verify(auditoria).registrar(EventoAuditoria.cambio("LEVANTAR_RESTRICCION", "USUARIO", 1L,
+				EstadoCuenta.RESTRINGIDA, EstadoCuenta.DESACTIVADA, null));
+		confirmar();
+	}
+
+	@Test
 	void levantarLaRestriccionReactivaLaCuenta() {
 		anfitrion.restringir("Fraude");
 		when(usuarioRepository.buscarParaActualizar(1L)).thenReturn(Optional.of(anfitrion));
