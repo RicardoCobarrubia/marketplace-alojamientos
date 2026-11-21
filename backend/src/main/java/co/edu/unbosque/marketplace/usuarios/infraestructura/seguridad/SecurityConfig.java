@@ -74,6 +74,8 @@ public class SecurityConfig {
 				.requestMatchers("/actuator/health/**").permitAll()
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/catalogos/**").permitAll()
+				// Búsqueda de alojamientos (MA-61): se puede buscar sin iniciar sesión
+				.requestMatchers(HttpMethod.GET, "/api/alojamientos").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/alojamientos/*/disponibilidad", "/api/alojamientos/*/periodos",
 						"/api/alojamientos/*/cotizacion", "/api/alojamientos/*/resenas")
 					.permitAll()
