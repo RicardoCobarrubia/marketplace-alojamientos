@@ -69,7 +69,8 @@ public class SecurityConfig {
 				.accessDeniedHandler(respuestas))
 			.authorizeHttpRequests(auth -> auth
 				// Públicas
-				.requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login", "/api/auth/reactivacion")
+				.requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login", "/api/auth/reactivacion",
+						"/api/auth/recuperacion", "/api/auth/recuperacion/confirmacion")
 					.permitAll()
 				.requestMatchers("/actuator/health/**").permitAll()
 				// Lo lee Prometheus dentro de la red de Docker; Traefik no publica /actuator
