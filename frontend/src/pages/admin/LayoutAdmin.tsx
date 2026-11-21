@@ -73,7 +73,6 @@ export default function LayoutAdmin() {
     { etiqueta: 'Reseñas', icono: ClipboardList, ruta: RUTAS.adminResenas },
     { etiqueta: 'Tarifas', icono: CreditCard, ruta: RUTAS.adminTarifas },
     { etiqueta: 'Reportes', icono: Download, ruta: RUTAS.adminReportes },
-    { etiqueta: 'Reportes', icono: Download },
     { etiqueta: 'Auditoría', icono: FileText, ruta: RUTAS.adminAuditoria },
   ];
 

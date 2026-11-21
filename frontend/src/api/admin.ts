@@ -10,7 +10,6 @@ import type {
 } from '../types/admin';
 import type { Reserva } from '../types/reserva';
 import { peticion, peticionArchivo } from './cliente';
-import { peticion } from './cliente';
 
 /** Endpoints del administrador (/api/admin/**). */
 
