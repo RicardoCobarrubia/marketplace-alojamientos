@@ -10,23 +10,13 @@ import { rutaDetalleReservaAnfitrion } from '../../routes/rutas';
 import type { Alojamiento } from '../../types/alojamiento';
 import { NOMBRE_ESTADO_RESERVA, type EstadoReserva, type Reserva } from '../../types/reserva';
 import { formatearFecha, formatearPrecio, formatearRango, hoyIso } from '../../utils/formato';
+import { ordenarReservas } from '../../utils/reservas';
 import './MisAlojamientosPage.css';
 import './ReservasRecibidasPage.css';
 
 type Filtro = EstadoReserva | 'TODAS';
 
 const FILTROS: Filtro[] = ['TODAS', 'CONFIRMADA', 'EN_REVISION', 'COMPLETADA', 'CANCELADA', 'PAGO_FALLIDO', 'PENDIENTE_PAGO'];
-
-/**
- * Las próximas estadías primero (por fecha de llegada) y después las que ya pasaron, de la más
- * reciente a la más antigua.
- */
-function ordenar(reservas: Reserva[]): Reserva[] {
-  const hoy = hoyIso();
-  const proximas = reservas.filter((r) => r.salida >= hoy).sort((a, b) => a.llegada.localeCompare(b.llegada));
-  const pasadas = reservas.filter((r) => r.salida < hoy).sort((a, b) => b.llegada.localeCompare(a.llegada));
-  return [...proximas, ...pasadas];
-}
 
 /**
  * Reservas de los alojamientos del anfitrión (MA-70, RF-26). Solo consulta: el anfitrión no
@@ -44,7 +34,7 @@ export default function ReservasRecibidasPage() {
     Promise.all([listarReservas(), listarMisAlojamientos()])
       .then(([lista, mios]) => {
         if (!activo) return;
-        setReservas(ordenar(lista));
+        setReservas(ordenarReservas(lista));
         setAlojamientos(new Map(mios.map((a) => [a.id, a])));
       })
       .catch((e: unknown) => activo && setError(mensajeParaUsuario(e)));

@@ -1,0 +1,344 @@
+/* ─── Detalle del alojamiento ─────────────────────────── */
+.alojamiento__encabezado h1 {
+  margin: 0 0 6px;
+  font-family: var(--fuente-titulos);
+  font-size: 1.7rem;
+  font-weight: 500;
+}
+
+.alojamiento__resumen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 18px;
+  color: var(--color-texto-suave);
+  font-size: 0.86rem;
+}
+
+.alojamiento__resumen span,
+.alojamiento__datos,
+.alojamiento__periodos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.alojamiento__calificacion {
+  color: var(--color-texto);
+  font-weight: 600;
+}
+
+.alojamiento__calificacion svg {
+  fill: #c8932f;
+  color: #c8932f;
+}
+
+.galeria {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: 170px 170px;
+  gap: 8px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  border-radius: var(--radio-lg);
+}
+
+.galeria--una {
+  grid-template-columns: 1fr;
+  grid-template-rows: 340px;
+}
+
+.galeria .miniatura {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.galeria__principal {
+  grid-row: span 2;
+}
+
+.galeria--una .galeria__principal {
+  grid-row: auto;
+}
+
+.alojamiento {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 370px;
+  gap: 40px;
+  align-items: start;
+}
+
+.alojamiento__seccion {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--color-borde);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.alojamiento__seccion:first-child {
+  padding-top: 0;
+}
+
+.alojamiento__seccion:last-child {
+  border-bottom: 0;
+}
+
+.alojamiento__seccion h2 {
+  margin: 0 0 10px;
+  font-family: var(--fuente-titulos);
+  font-size: 1.12rem;
+  font-weight: 500;
+}
+
+.alojamiento__seccion p {
+  margin: 0 0 8px;
+}
+
+.alojamiento__datos {
+  color: var(--color-texto-suave);
+}
+
+.alojamiento__descripcion {
+  white-space: pre-line;
+}
+
+.alojamiento__servicios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alojamiento__servicios li {
+  padding: 5px 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  font-size: 0.82rem;
+}
+
+.alojamiento__reglas {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.alojamiento__periodos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.alojamiento__periodos li {
+  padding: 5px 12px;
+  border-radius: var(--radio);
+  background: #eef4ea;
+  color: #3f6b2f;
+  font-size: 0.82rem;
+}
+
+.alojamiento__resenas {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alojamiento__resenas p {
+  margin: 4px 0 0;
+}
+
+.alojamiento__resena-encabezado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── Tarjeta para cotizar y reservar ─────────────────── */
+.tarjeta-reserva {
+  position: sticky;
+  top: 84px;
+  display: grid;
+  gap: 14px;
+}
+
+.tarjeta-reserva .campo {
+  margin-bottom: 0;
+}
+
+.tarjeta-reserva__precio {
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.88rem;
+}
+
+.tarjeta-reserva__precio strong {
+  color: var(--color-texto);
+  font-family: var(--fuente-titulos);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.tarjeta-reserva__fechas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tarjeta-reserva__error-fechas {
+  margin: -6px 0 0;
+}
+
+.tarjeta-reserva__servicios {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.opcion-servicio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.opcion-servicio:has(input:checked) {
+  border-color: var(--color-borde-foco);
+  background: #faf6ef;
+}
+
+.opcion-servicio input {
+  accent-color: var(--color-cafe);
+}
+
+.opcion-servicio__nombre {
+  flex: 1;
+}
+
+.opcion-servicio__costo {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.opcion-servicio__costo small {
+  display: block;
+  color: var(--color-texto-suave);
+  font-size: 0.72rem;
+}
+
+.cargando--compacto {
+  justify-content: flex-start;
+  padding: 4px 0;
+}
+
+.tarjeta-reserva__nota {
+  margin: 0;
+  text-align: center;
+}
+
+/* ─── Reseña ──────────────────────────────────────────── */
+.selector-estrellas {
+  margin: 14px 0;
+  padding: 0;
+  border: 0;
+}
+
+.selector-estrellas__opciones {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.selector-estrellas__estrella {
+  display: inline-flex;
+  padding: 2px;
+  color: #e2d6c2;
+  cursor: pointer;
+}
+
+.selector-estrellas__estrella--activa {
+  color: #c8932f;
+}
+
+.selector-estrellas__estrella--activa svg {
+  fill: currentColor;
+}
+
+.selector-estrellas__estrella:has(input:focus-visible) {
+  border-radius: var(--radio-sm);
+  box-shadow: var(--sombra-foco);
+}
+
+.selector-estrellas__texto {
+  margin-left: 8px;
+  color: var(--color-texto-suave);
+  font-size: 0.84rem;
+}
+
+.resena-publicada {
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.resena-publicada p {
+  margin: 4px 0 0;
+  white-space: pre-line;
+}
+
+.detalle-huesped__texto {
+  margin: 0 0 14px;
+}
+
+.detalle-huesped__pendiente {
+  align-items: center;
+}
+
+.detalle-huesped__pendiente span {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .alojamiento {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .tarjeta-reserva {
+    position: static;
+  }
+
+  .galeria {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 220px 110px;
+  }
+
+  .galeria__principal {
+    grid-column: span 2;
+    grid-row: auto;
+  }
+
+  .galeria--una {
+    grid-template-columns: 1fr;
+    grid-template-rows: 240px;
+  }
+
+  .galeria--una .galeria__principal {
+    grid-column: auto;
+  }
+
+  .galeria__foto:nth-child(n + 4) {
+    display: none;
+  }
+}

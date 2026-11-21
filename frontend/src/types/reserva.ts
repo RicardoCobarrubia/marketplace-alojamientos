@@ -47,3 +47,43 @@ export const NOMBRE_ESTADO_RESERVA: Record<EstadoReserva, string> = {
   CANCELADA: 'Cancelada',
   COMPLETADA: 'Completada',
 };
+
+/** Línea de descuento de una cotización, por ejemplo el de estadía larga. */
+export interface LineaDescuento {
+  nombre: string;
+  valor: number;
+}
+
+/** Respuesta de GET /api/alojamientos/{id}/cotizacion (MA-63, MA-64). */
+export interface Cotizacion {
+  alojamientoId: number;
+  llegada: string;
+  salida: string;
+  noches: number;
+  precioNoche: number;
+  subtotal: number;
+  descuentos: LineaDescuento[];
+  totalDescuentos: number;
+  limpieza: number;
+  servicios: ServicioReservado[];
+  totalServicios: number;
+  porcentajeTarifaServicio: number;
+  tarifaServicio: number;
+  total: number;
+}
+
+/** Cuerpo de POST /api/reservas (MA-66). */
+export interface DatosReserva {
+  alojamientoId: number;
+  llegada: string;
+  salida: string;
+  huespedes: number;
+  servicioIds: number[];
+}
+
+/** Respuesta 202 de POST /api/reservas: el mismo intento sigue cobrándose. */
+export interface ReservaEnProceso {
+  reservaId: number;
+  estado: 'PENDIENTE_PAGO';
+  mensaje: string;
+}
