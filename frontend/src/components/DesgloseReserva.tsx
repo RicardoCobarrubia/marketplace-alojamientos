@@ -3,10 +3,17 @@ import { NOMBRE_MODALIDAD } from '../types/alojamiento';
 import { formatearPrecio } from '../utils/formato';
 import './DesgloseReserva.css';
 
+/** Lo que tienen en común una reserva y una cotización (MA-63): sirve para las dos. */
+export type DatosDesglose = Pick<
+  Reserva,
+  'precioNoche' | 'noches' | 'subtotal' | 'totalDescuentos' | 'limpieza' | 'servicios' | 'tarifaServicio' | 'total'
+>;
+
 interface PropiedadesDesglose {
-  reserva: Reserva;
+  reserva: DatosDesglose;
   /** Muestra lo que recibe el anfitrión: el total sin la tarifa de servicio de la plataforma. */
   paraAnfitrion?: boolean;
+  etiquetaTotal?: string;
 }
 
 /**
@@ -14,7 +21,11 @@ interface PropiedadesDesglose {
  * servicios adicionales, tarifa de servicio y total. Son los valores guardados al reservar, así
  * que no cambian aunque después cambien los precios del alojamiento.
  */
-export function DesgloseReserva({ reserva: r, paraAnfitrion }: PropiedadesDesglose) {
+export function DesgloseReserva({
+  reserva: r,
+  paraAnfitrion,
+  etiquetaTotal = 'Total pagado por el huésped',
+}: PropiedadesDesglose) {
   return (
     <dl className="desglose">
       <div>
@@ -50,7 +61,7 @@ export function DesgloseReserva({ reserva: r, paraAnfitrion }: PropiedadesDesglo
         <dd>{formatearPrecio(r.tarifaServicio)}</dd>
       </div>
       <div className="desglose__total">
-        <dt>Total pagado por el huésped</dt>
+        <dt>{etiquetaTotal}</dt>
         <dd>{formatearPrecio(r.total)}</dd>
       </div>
       {paraAnfitrion && (

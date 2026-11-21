@@ -57,3 +57,12 @@ export function rutaPerfil(rol: Rol): string {
 export function rutaDetalleReservaAnfitrion(id: number): string {
   return `${RUTAS.reservasRecibidas}/${id}`;
 }
+
+export function rutaReservaHuesped(id: number): string {
+  return `${RUTAS.huesped}/reservas/${id}`;
+}
+
+/** Detalle de un alojamiento publicado, desde donde el huésped cotiza y reserva. */
+export function rutaAlojamientoHuesped(id: number): string {
+  return `${RUTAS.huesped}/alojamientos/${id}`;
+}

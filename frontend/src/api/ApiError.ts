@@ -10,6 +10,8 @@ interface ProblemDetail {
   correlationId?: string | null;
   errores?: Record<string, string>;
   campos?: string[];
+  /** Número de la reserva en los errores de POST /api/reservas (pago rechazado, sin respuesta...). */
+  reservaId?: number | null;
 }
 
 interface DatosApiError {
@@ -19,6 +21,7 @@ interface DatosApiError {
   correlationId?: string | null;
   errores?: Record<string, string>;
   campos?: string[];
+  reservaId?: number | null;
 }
 
 /** Error de una petición a la API. `codigo` es el código estable que envía el backend. */
@@ -30,6 +33,8 @@ export class ApiError extends Error {
   readonly errores: Record<string, string>;
   /** Campos que faltan cuando el backend responde INFORMACION_INCOMPLETA. */
   readonly campos: string[];
+  /** Reserva que quedó registrada aunque el pago no se completó (POST /api/reservas). */
+  readonly reservaId: number | null;
 
   constructor(datos: DatosApiError) {
     super(datos.mensaje);
@@ -39,6 +44,7 @@ export class ApiError extends Error {
     this.correlationId = datos.correlationId ?? null;
     this.errores = datos.errores ?? {};
     this.campos = datos.campos ?? [];
+    this.reservaId = datos.reservaId ?? null;
   }
 
   static async desdeRespuesta(respuesta: Response): Promise<ApiError> {
@@ -55,6 +61,7 @@ export class ApiError extends Error {
       correlationId: problema.correlationId ?? respuesta.headers.get('X-Correlation-Id'),
       errores: problema.errores,
       campos: problema.campos,
+      reservaId: problema.reservaId,
     });
   }
 }

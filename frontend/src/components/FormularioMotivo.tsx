@@ -13,6 +13,8 @@ interface PropiedadesFormularioMotivo {
   ayuda?: string;
   textoConfirmar: string;
   textoEnviando: string;
+  /** Texto del botón que cierra el formulario sin hacer nada. */
+  textoDescartar?: string;
   /** Debe lanzar el error del backend si falla; el formulario lo muestra. */
   alConfirmar: (motivo: string) => Promise<void>;
   alCancelar: () => void;
@@ -29,6 +31,7 @@ export function FormularioMotivo({
   ayuda,
   textoConfirmar,
   textoEnviando,
+  textoDescartar = 'Cancelar',
   alConfirmar,
   alCancelar,
 }: PropiedadesFormularioMotivo) {
@@ -77,7 +80,7 @@ export function FormularioMotivo({
       />
       <div className="formulario-motivo__botones">
         <button type="button" className="boton boton--secundario boton--pequeno" onClick={alCancelar} disabled={enviando}>
-          Cancelar
+          {textoDescartar}
         </button>
         <button type="button" className="boton boton--peligro boton--pequeno" onClick={confirmar} disabled={enviando}>
           {enviando && <LoaderCircle size={14} className="girando" aria-hidden="true" />}

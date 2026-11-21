@@ -107,6 +107,11 @@
     width: 100%;
   }
 
+  /* El menú va siempre en su propia fila: los íconos de la derecha quedan junto al logo */
+  .barra-superior__nav {
+    flex-basis: 100%;
+  }
+
   .barra-superior__derecha {
     position: absolute;
     top: 12px;

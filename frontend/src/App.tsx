@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from 'react-router';
-import { LayoutApp } from './components/LayoutApp';
 import AlojamientosAdminPage from './pages/admin/AlojamientosAdminPage';
 import AuditoriaPage from './pages/admin/AuditoriaPage';
 import CatalogosPage from './pages/admin/CatalogosPage';
@@ -20,7 +19,10 @@ import ReservasRecibidasPage from './pages/anfitrion/ReservasRecibidasPage';
 import NotificacionesPage from './pages/comunes/NotificacionesPage';
 import PerfilPage from './pages/comunes/PerfilPage';
 import LoginPage from './pages/login/LoginPage';
-import InicioProvisional from './pages/provisionales/InicioProvisional';
+import AlojamientoPage from './pages/huesped/AlojamientoPage';
+import DetalleReservaHuespedPage from './pages/huesped/DetalleReservaHuespedPage';
+import LayoutHuesped from './pages/huesped/LayoutHuesped';
+import MisReservasPage from './pages/huesped/MisReservasPage';
 import PaginaPendiente from './pages/provisionales/PaginaPendiente';
 import RegistroPage from './pages/registro/RegistroPage';
 import { RedireccionInicial, RutaProtegida, SoloInvitados } from './routes/Guardias';
@@ -34,12 +36,14 @@ export default function App() {
       <Route element={<SoloInvitados />}>
         <Route path={RUTAS.login} element={<LoginPage />} />
         <Route path={RUTAS.registro} element={<RegistroPage />} />
-        <Route path={RUTAS.recuperarContrasena} element={<PaginaPendiente titulo="Recuperar contraseña" />} />
+        <Route path={RUTAS.recuperarContrasena} element={<PaginaPendiente titulo="Recuperar contraseÃ±a" />} />
       </Route>
 
       <Route element={<RutaProtegida roles={['HUESPED']} />}>
-        <Route path={RUTAS.huesped} element={<LayoutApp />}>
-          <Route index element={<InicioProvisional />} />
+        <Route path={RUTAS.huesped} element={<LayoutHuesped />}>
+          <Route index element={<MisReservasPage />} />
+          <Route path="reservas/:id" element={<DetalleReservaHuespedPage />} />
+          <Route path="alojamientos/:id" element={<AlojamientoPage />} />
           <Route path="notificaciones" element={<NotificacionesPage />} />
           <Route path="perfil" element={<PerfilPage />} />
         </Route>
