@@ -21,6 +21,7 @@ import PerfilPage from './pages/comunes/PerfilPage';
 import LoginPage from './pages/login/LoginPage';
 import AlojamientoPage from './pages/huesped/AlojamientoPage';
 import DetalleReservaHuespedPage from './pages/huesped/DetalleReservaHuespedPage';
+import ExplorarPage from './pages/huesped/ExplorarPage';
 import LayoutHuesped from './pages/huesped/LayoutHuesped';
 import MisReservasPage from './pages/huesped/MisReservasPage';
 import PaginaPendiente from './pages/provisionales/PaginaPendiente';
@@ -36,12 +37,13 @@ export default function App() {
       <Route element={<SoloInvitados />}>
         <Route path={RUTAS.login} element={<LoginPage />} />
         <Route path={RUTAS.registro} element={<RegistroPage />} />
-        <Route path={RUTAS.recuperarContrasena} element={<PaginaPendiente titulo="Recuperar contraseÃ±a" />} />
+        <Route path={RUTAS.recuperarContrasena} element={<PaginaPendiente titulo="Recuperar contraseña" />} />
       </Route>
 
       <Route element={<RutaProtegida roles={['HUESPED']} />}>
         <Route path={RUTAS.huesped} element={<LayoutHuesped />}>
-          <Route index element={<MisReservasPage />} />
+          <Route index element={<ExplorarPage />} />
+          <Route path="reservas" element={<MisReservasPage />} />
           <Route path="reservas/:id" element={<DetalleReservaHuespedPage />} />
           <Route path="alojamientos/:id" element={<AlojamientoPage />} />
           <Route path="notificaciones" element={<NotificacionesPage />} />
