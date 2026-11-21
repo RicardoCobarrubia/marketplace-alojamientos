@@ -57,6 +57,25 @@ public class PanelService {
 	 */
 	@Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
 	public IngresosDTO ingresos(LocalDate desde, LocalDate hasta) {
+		Periodo periodo = periodo(desde, hasta);
+		Instant inicio = periodo.inicio(zonaHoraria);
+		Instant fin = periodo.fin(zonaHoraria);
+
+		Ingresos ingresos = consultas.ingresos(inicio, fin);
+		List<IngresosDTO.CiudadReservas> ciudades = consultas.ciudadesConMasReservas(inicio, fin)
+				.stream()
+				.map(ciudad -> new IngresosDTO.CiudadReservas(ciudad.getCiudadId(), ciudad.getCiudad(),
+						ciudad.getDepartamento(), ciudad.getReservas()))
+				.toList();
+		return new IngresosDTO(periodo.desde(), periodo.hasta(), ingresos.getIngresos(), ingresos.getReservas(),
+				ciudades);
+	}
+
+	/**
+	 * El rango pedido, con los valores por defecto de MA-84: sin fechas, los últimos 30 días hasta
+	 * hoy en la hora de Colombia; con solo una, los 30 días que empiezan o terminan en ella.
+	 */
+	public Periodo periodo(LocalDate desde, LocalDate hasta) {
 		LocalDate fin = hasta;
 		if (fin == null) {
 			fin = desde != null ? desde.plusDays(DIAS_POR_DEFECTO - 1L) : LocalDate.now(reloj.withZone(zonaHoraria));
@@ -66,16 +85,7 @@ public class PanelService {
 			throw new SolicitudInvalidaException("RANGO_INVALIDO",
 					"La fecha inicial no puede ser posterior a la final.");
 		}
-		Instant inicioDelDia = inicio.atStartOfDay(zonaHoraria).toInstant();
-		Instant finDelRango = fin.plusDays(1).atStartOfDay(zonaHoraria).toInstant();
-
-		Ingresos ingresos = consultas.ingresos(inicioDelDia, finDelRango);
-		List<IngresosDTO.CiudadReservas> ciudades = consultas.ciudadesConMasReservas(inicioDelDia, finDelRango)
-				.stream()
-				.map(ciudad -> new IngresosDTO.CiudadReservas(ciudad.getCiudadId(), ciudad.getCiudad(),
-						ciudad.getDepartamento(), ciudad.getReservas()))
-				.toList();
-		return new IngresosDTO(inicio, fin, ingresos.getIngresos(), ingresos.getReservas(), ciudades);
+		return new Periodo(inicio, fin);
 	}
 
 	private static Map<String, Long> conCeros(Enum<?>[] claves, List<Conteo> conteos) {
