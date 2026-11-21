@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,13 @@ public class RecuperacionContrasenaService {
 	private static final String USUARIO = "USUARIO";
 	private static final String CAMBIAR_CONTRASENA = "CAMBIAR_CONTRASENA";
 	private static final int MAXIMO_BYTES_CONTRASENA = 72;
+	/**
+	 * Solicitudes que se atienden a la vez en segundo plano. Cada una usa una conexión a la base de
+	 * datos: con este tope una ráfaga no acapara el pool (10 por réplica) ni acumula tareas en
+	 * memoria. Las que pasan del tope se descartan con la misma respuesta; quien de verdad necesita
+	 * el código lo vuelve a pedir.
+	 */
+	static final int SOLICITUDES_SIMULTANEAS = 4;
 
 	private final EmisionCodigos emision;
 	private final UsuarioRepository usuarios;
@@ -55,6 +63,7 @@ public class RecuperacionContrasenaService {
 	/** Para comparar contra algo cuando no hay código: el tiempo no delata si la cuenta existe. */
 	private final String hashFicticio;
 	private final ExecutorService envios = Executors.newVirtualThreadPerTaskExecutor();
+	private final Semaphore cupos = new Semaphore(SOLICITUDES_SIMULTANEAS);
 
 	public RecuperacionContrasenaService(EmisionCodigos emision, UsuarioRepository usuarios,
 			CodigoRecuperacionRepository codigos, PasswordEncoder passwordEncoder, EnvioCorreo correo,
@@ -77,9 +86,14 @@ public class RecuperacionContrasenaService {
 
 	/**
 	 * MA-50, escenario 1: responde de inmediato y en otro hilo crea un código de 6 dígitos que vale
-	 * 15 minutos y lo envía al correo. Los logs de ese hilo conservan el id de correlación.
+	 * 15 minutos y lo envía al correo. Los logs de ese hilo conservan el id de correlación. Atiende
+	 * máximo {@value #SOLICITUDES_SIMULTANEAS} a la vez.
 	 */
 	public void solicitar(String email) {
+		if (!cupos.tryAcquire()) {
+			log.warn("Demasiadas solicitudes de recuperación a la vez: se descarta una");
+			return;
+		}
 		Map<String, String> contexto = MDC.getCopyOfContextMap();
 		envios.execute(() -> {
 			if (contexto != null) {
@@ -90,6 +104,7 @@ public class RecuperacionContrasenaService {
 			} catch (RuntimeException e) {
 				log.warn("No se pudo crear o enviar el código de recuperación", e);
 			} finally {
+				cupos.release();
 				MDC.clear();
 			}
 		});

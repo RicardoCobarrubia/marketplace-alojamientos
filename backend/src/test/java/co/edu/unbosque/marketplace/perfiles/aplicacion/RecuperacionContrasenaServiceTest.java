@@ -15,6 +15,8 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +110,29 @@ class RecuperacionContrasenaServiceTest {
 				anyString());
 		servicio.solicitar(CORREO);
 		verify(correo, timeout(2000)).enviar(eq(CORREO), anyString(), anyString());
+	}
+
+	@Test
+	void unaRafagaDeSolicitudesNoAcumulaTareasNiAcaparaLaBaseDeDatos() throws Exception {
+		CountDownLatch liberar = new CountDownLatch(1);
+		CountDownLatch ocupadas = new CountDownLatch(RecuperacionContrasenaService.SOLICITUDES_SIMULTANEAS);
+		when(emision.emitir(anyString())).thenAnswer(invocacion -> {
+			ocupadas.countDown();
+			liberar.await(5, TimeUnit.SECONDS);
+			return Optional.empty();
+		});
+
+		for (int i = 0; i < RecuperacionContrasenaService.SOLICITUDES_SIMULTANEAS + 3; i++) {
+			servicio.solicitar("correo" + i + "@correo.com");
+		}
+		assertThat(ocupadas.await(5, TimeUnit.SECONDS)).isTrue();
+		liberar.countDown();
+
+		verify(emision, timeout(2000).times(RecuperacionContrasenaService.SOLICITUDES_SIMULTANEAS))
+				.emitir(anyString());
+		// Al terminar se liberan los cupos
+		servicio.solicitar("otra@correo.com");
+		verify(emision, timeout(2000)).emitir("otra@correo.com");
 	}
 
 	// ─────────────────────────────────────────
