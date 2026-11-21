@@ -1,5 +1,6 @@
 /**
- * Módulo de perfiles (MA-51, MA-52): estado de la cuenta que maneja su dueño. Desactivar la
+ * Módulo de perfiles (MA-50, MA-51, MA-52): estado de la cuenta que maneja su dueño y
+ * recuperación de la contraseña, que envía el código por correo con el módulo de notificaciones. Desactivar la
  * cuenta toca otros módulos (pausa los alojamientos y revisa las reservas), por eso vive aquí y
  * no en usuarios, que no depende de ninguno. Consultar y actualizar el perfil y reactivar la
  * cuenta solo tocan al usuario y están en el módulo de usuarios.

@@ -232,6 +232,18 @@ public class Usuario implements UserDetails {
 		this.versionSesion++;
 	}
 
+	/**
+	 * Nueva contraseña tras recuperarla (MA-50, escenario 2): la anterior deja de servir y todas
+	 * las sesiones abiertas se cierran, porque cambia la versión de sesión. También se levanta el
+	 * bloqueo por intentos fallidos.
+	 */
+	public void cambiarContrasena(String nuevoHash) {
+		this.passwordHash = nuevoHash;
+		this.versionSesion++;
+		this.intentosFallidos = 0;
+		this.bloqueadoHasta = null;
+	}
+
 	/** El dueño la reactiva al iniciar sesión y confirmar (MA-52, escenario 3). */
 	public void reactivar() {
 		if (estadoCuenta != EstadoCuenta.DESACTIVADA) {

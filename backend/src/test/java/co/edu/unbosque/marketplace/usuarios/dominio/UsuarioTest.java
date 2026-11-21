@@ -168,4 +168,18 @@ class UsuarioTest {
 		assertThatThrownBy(usuario::reactivar).isInstanceOf(ReglaNegocioException.class);
 		assertThat(usuario.getEstadoCuenta()).isEqualTo(EstadoCuenta.RESTRINGIDA);
 	}
+
+	@Test
+	void alCambiarLaContrasenaLaAnteriorYSusSesionesDejanDeServir() {
+		Usuario usuario = TestDatos.usuario(1L, Rol.HUESPED, "hash-viejo");
+		usuario.registrarIntentoFallido(TestDatos.AHORA, 1, Duration.ofMinutes(15));
+		int version = usuario.getVersionSesion();
+
+		usuario.cambiarContrasena("hash-nuevo");
+
+		assertThat(usuario.getPassword()).isEqualTo("hash-nuevo");
+		assertThat(usuario.getVersionSesion()).isEqualTo(version + 1);
+		assertThat(usuario.estaBloqueadoTemporalmente(TestDatos.AHORA)).isFalse();
+		assertThat(usuario.getIntentosFallidos()).isZero();
+	}
 }
