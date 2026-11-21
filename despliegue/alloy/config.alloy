@@ -1,0 +1,35 @@
+// Recolecta los logs de los contenedores y los envía a Loki (ADR-012).
+// Cada línea queda con las etiquetas "servicio" (backend, traefik...) y "contenedor"
+// (marketplace-backend-1, marketplace-backend-2...), para filtrar por réplica en Grafana.
+
+discovery.docker "contenedores" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "contenedores" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "servicio"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "contenedor"
+  }
+}
+
+loki.source.docker "contenedores" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.contenedores.targets
+  relabel_rules = discovery.relabel.contenedores.rules
+  forward_to    = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

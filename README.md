@@ -12,6 +12,7 @@ El MVP demuestra el flujo de punta a punta:
 marketplace-alojamientos/
 ├── backend/     API REST · Java 21 · Spring Boot 4.1 (ver backend/README.md)
 ├── frontend/    Aplicación web · React
+├── despliegue/  Docker Compose con Traefik, 2 réplicas del backend y Grafana (ver despliegue/README.md)
 ├── docs/        Documentación técnica que acompaña al código
 └── .github/     Plantilla de Pull Request y flujos de GitHub Actions
 ```
@@ -30,6 +31,7 @@ Monolito modular en capas (presentación, aplicación, dominio, infraestructura)
 | Balanceador | Traefik |
 | Pagos | Stripe en modo pruebas, detrás del puerto `PasarelaPagos` |
 | Logs | JSON con ID de correlación, Grafana Alloy, Loki y Grafana |
+| Métricas | Micrometer, Prometheus y Grafana |
 
 ## Flujo de trabajo
 

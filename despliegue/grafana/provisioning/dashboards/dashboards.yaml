@@ -1,0 +1,10 @@
+# Tableros de Grafana, cargados al arrancar desde /etc/grafana/dashboards (MA-93)
+apiVersion: 1
+
+providers:
+  - name: marketplace
+    folder: Marketplace
+    type: file
+    disableDeletion: true
+    options:
+      path: /etc/grafana/dashboards

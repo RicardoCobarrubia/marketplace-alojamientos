@@ -1,0 +1,9 @@
+# Lo que no entra en la imagen: compilados locales, configuración del IDE y secretos
+target/
+.env
+.env.*
+.settings/
+.classpath
+.project
+.idea/
+*.iml
