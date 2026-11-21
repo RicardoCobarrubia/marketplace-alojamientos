@@ -10,7 +10,13 @@ import { CampoTexto } from '../../components/CampoTexto';
 import { LayoutAutenticacion } from '../../components/LayoutAutenticacion';
 import { RUTAS } from '../../routes/rutas';
 import type { DatosRegistro, RolRegistro } from '../../types/auth';
-import { bytesUtf8, FORMATO_CORREO, FORMATO_TELEFONO, MAXIMO_BYTES_CONTRASENA } from '../../utils/validaciones';
+import {
+  bytesUtf8,
+  FORMATO_CORREO,
+  FORMATO_TELEFONO,
+  MAXIMO_BYTES_CONTRASENA,
+  MENSAJE_TELEFONO,
+} from '../../utils/validaciones';
 import './RegistroPage.css';
 
 type CampoFormulario = 'nombre' | 'email' | 'telefono' | 'password';
@@ -33,7 +39,7 @@ function validar(datos: DatosRegistro): ErroresCampos {
   else if (!FORMATO_CORREO.test(datos.email)) errores.email = 'El correo no tiene un formato válido.';
 
   if (!datos.telefono) errores.telefono = 'El teléfono es obligatorio.';
-  else if (!FORMATO_TELEFONO.test(datos.telefono)) errores.telefono = 'El teléfono debe tener entre 7 y 20 dígitos.';
+  else if (!FORMATO_TELEFONO.test(datos.telefono)) errores.telefono = MENSAJE_TELEFONO;
 
   if (!datos.password) errores.password = 'La contraseña es obligatoria.';
   else if (datos.password.length < 8 || datos.password.length > 72)
