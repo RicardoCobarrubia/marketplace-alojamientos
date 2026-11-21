@@ -47,6 +47,10 @@ public class CargaDatosDesarrollo {
 						passwordEncoder.encode(password), Rol.ADMINISTRADOR, reloj.instant()));
 				log.info("Administrador inicial creado");
 			} catch (DataIntegrityViolationException e) {
+				// Solo se ignora si de verdad lo creó otra réplica; cualquier otro error detiene el arranque
+				if (!usuarios.existsByEmail(correo)) {
+					throw e;
+				}
 				log.info("Otra réplica ya creó el administrador inicial");
 			}
 		};

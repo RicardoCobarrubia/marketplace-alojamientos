@@ -107,10 +107,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * (1 - (sum(rate(traefik_service_requests_total{service=\"backend@docker\",code=~\"5..\"}[1h])) or vector(0)) / sum(rate(traefik_service_requests_total{service=\"backend@docker\"}[1h])))"
+          "expr": "100 * (1 - (sum(rate(traefik_router_requests_total{router=\"api@docker\",code=~\"5..\"}[1h])) or vector(0)) / sum(rate(traefik_router_requests_total{router=\"api@docker\"}[1h])))"
         }
       ],
-      "description": "Porcentaje de peticiones a la API que Traefik respondió sin error del servidor (ASR-06: 99,5 %).",
+      "description": "Porcentaje de peticiones a /api que Traefik respondió sin error del servidor, incluidos los 503 cuando ninguna réplica está lista (ASR-06: 99,5 %).",
       "fieldConfig": {
         "defaults": {
           "unit": "percent"
@@ -317,7 +317,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (code) (rate(traefik_service_requests_total{service=\"backend@docker\"}[1m]))",
+          "expr": "sum by (code) (rate(traefik_router_requests_total{router=\"api@docker\"}[1m]))",
           "legendFormat": "{{code}}"
         }
       ],

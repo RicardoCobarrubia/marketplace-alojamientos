@@ -23,6 +23,8 @@ services:
       - --metrics.prometheus=true
       - --metrics.prometheus.entrypoint=metricas
       - --metrics.prometheus.addservicesLabels=true
+      # Por router: cuenta también los 503 que Traefik responde cuando ninguna réplica está lista
+      - --metrics.prometheus.addroutersLabels=true
       - --api.dashboard=true
       - --api.insecure=true
       - --accesslog=true

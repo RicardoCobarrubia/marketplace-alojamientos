@@ -22,7 +22,8 @@ import co.edu.unbosque.marketplace.TestcontainersConfiguration;
  * métricas, sin token. El resto de /actuator sigue cerrado. Requiere Docker en ejecución.
  */
 @Import(TestcontainersConfiguration.class)
-@SpringBootTest
+// Las pruebas de Spring Boot apagan la exportación de métricas por defecto; aquí se prueba
+@SpringBootTest(properties = "management.prometheus.metrics.export.enabled=true")
 @ActiveProfiles("test")
 class ObservabilidadIntegrationTest {
 

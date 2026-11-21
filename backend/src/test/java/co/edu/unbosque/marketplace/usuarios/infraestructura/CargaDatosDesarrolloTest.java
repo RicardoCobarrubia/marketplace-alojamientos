@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.usuarios.infraestructura;
 import static co.edu.unbosque.marketplace.TestDatos.AHORA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,9 +60,18 @@ class CargaDatosDesarrolloTest {
 
 	@Test
 	void siOtraReplicaLoCreoALaVezSigueArrancando() {
-		when(usuarios.existsByEmail("admin@correo.com")).thenReturn(false);
+		when(usuarios.existsByEmail("admin@correo.com")).thenReturn(false, true);
 		when(usuarios.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("correo duplicado"));
 
 		assertThatCode(() -> cargador("admin@correo.com", "clave-segura-1").run()).doesNotThrowAnyException();
+	}
+
+	@Test
+	void otroErrorDeLaBaseDeDatosDetieneElArranque() {
+		when(usuarios.existsByEmail("admin@correo.com")).thenReturn(false, false);
+		when(usuarios.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("valor muy largo"));
+
+		assertThatThrownBy(() -> cargador("admin@correo.com", "clave-segura-1").run())
+				.isInstanceOf(DataIntegrityViolationException.class);
 	}
 }
