@@ -3,6 +3,7 @@ package co.edu.unbosque.marketplace.perfiles.aplicacion;
 import static co.edu.unbosque.marketplace.TestDatos.AHORA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -130,9 +132,12 @@ class RecuperacionContrasenaServiceTest {
 
 		verify(emision, timeout(2000).times(RecuperacionContrasenaService.SOLICITUDES_SIMULTANEAS))
 				.emitir(anyString());
-		// Al terminar se liberan los cupos
-		servicio.solicitar("otra@correo.com");
-		verify(emision, timeout(2000)).emitir("otra@correo.com");
+		// Al terminar se liberan los cupos: una solicitud nueva vuelve a atenderse. Se repite hasta
+		// que algún trabajador devuelva su cupo, porque abrir el latch no espera a que terminen
+		await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+			servicio.solicitar("otra@correo.com");
+			verify(emision, timeout(200).atLeastOnce()).emitir("otra@correo.com");
+		});
 	}
 
 	// ─────────────────────────────────────────
