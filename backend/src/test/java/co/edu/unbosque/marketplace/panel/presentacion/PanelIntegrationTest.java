@@ -138,6 +138,7 @@ class PanelIntegrationTest {
 				.andExpect(jsonPath("$.hasta").value(HOY.toString()))
 				.andExpect(jsonPath("$.ingresosEstimados").value(esperado.doubleValue()))
 				.andExpect(jsonPath("$.reservas").value(3))
+				.andExpect(jsonPath("$.ciudadesConMasReservas[0].ciudadId").value(MEDELLIN))
 				.andExpect(jsonPath("$.ciudadesConMasReservas[0].ciudad").value("Medellín"))
 				.andExpect(jsonPath("$.ciudadesConMasReservas[0].reservas").value(2))
 				.andExpect(jsonPath("$.ciudadesConMasReservas[1].ciudad").value("Cartagena"))

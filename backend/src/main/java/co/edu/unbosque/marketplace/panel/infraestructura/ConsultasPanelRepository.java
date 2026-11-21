@@ -61,7 +61,7 @@ public interface ConsultasPanelRepository extends Repository<Reserva, Long> {
 
 	/** Las 5 ciudades con más reservas; a igual número, por nombre (MA-84, escenario 2). */
 	@Query(value = """
-			SELECT c.id AS ciudadId, c.nombre AS ciudad, c.departamento AS departamento, count(*) AS reservas
+			SELECT c.id AS "ciudadId", c.nombre AS ciudad, c.departamento AS departamento, count(*) AS reservas
 			FROM reserva r
 			JOIN alojamiento a ON a.id = r.alojamiento_id
 			JOIN ciudad c ON c.id = a.ciudad_id
