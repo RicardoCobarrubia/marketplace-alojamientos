@@ -1,0 +1,59 @@
+.desglose {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.desglose > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.desglose dt {
+  color: var(--color-texto-suave);
+}
+
+.desglose dd {
+  margin: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.desglose__detalle {
+  display: block;
+  font-size: 0.74rem;
+}
+
+.desglose__descuento dd {
+  color: #3f6b2f;
+}
+
+.desglose__total {
+  padding-top: 12px;
+  border-top: 1px solid var(--color-borde);
+}
+
+.desglose__total dt,
+.desglose__total dd {
+  color: var(--color-texto);
+  font-weight: 600;
+}
+
+.desglose__total dd {
+  font-family: var(--fuente-titulos);
+  font-size: 1.15rem;
+}
+
+.desglose__anfitrion {
+  padding: 10px 12px;
+  border-radius: var(--radio);
+  background: #eef4ea;
+}
+
+.desglose__anfitrion dt,
+.desglose__anfitrion dd {
+  color: #3f6b2f;
+  font-weight: 600;
+}

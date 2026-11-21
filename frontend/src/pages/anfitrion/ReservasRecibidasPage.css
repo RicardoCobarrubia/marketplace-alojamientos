@@ -1,0 +1,83 @@
+.reservas__proxima strong {
+  font-weight: 600;
+}
+
+.reservas__huespedes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── Detalle de una reserva ──────────────────────────── */
+.detalle-reserva {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.detalle-reserva__principal {
+  display: grid;
+  gap: 16px;
+}
+
+.detalle-reserva__alojamiento {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.detalle-reserva__alojamiento .miniatura {
+  width: 96px;
+  height: 68px;
+  border-radius: var(--radio);
+}
+
+.detalle-reserva__titulo {
+  font-family: var(--fuente-titulos);
+  font-size: 1.1rem;
+}
+
+.detalle-reserva__datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-borde);
+  font-size: 0.86rem;
+}
+
+.detalle-reserva__datos dt {
+  color: var(--color-texto-suave);
+  font-size: 0.74rem;
+}
+
+.detalle-reserva__datos dd {
+  margin: 2px 0 0;
+  font-weight: 500;
+}
+
+.detalle-reserva__nota {
+  margin: 12px 0 0;
+}
+
+@media (max-width: 900px) {
+  .detalle-reserva {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detalle-reserva__datos--sin-borde {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.formulario__volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+}
