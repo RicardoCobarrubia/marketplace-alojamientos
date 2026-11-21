@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { ArrowLeft, CalendarDays, CircleAlert, LoaderCircle, MapPin, Star, Users } from 'lucide-react';
 import { obtenerAlojamiento } from '../../api/alojamientos';
 import { listarPeriodos } from '../../api/disponibilidad';
@@ -11,6 +11,7 @@ import { RUTAS } from '../../routes/rutas';
 import type { Alojamiento, PeriodoDisponible } from '../../types/alojamiento';
 import type { ResenasAlojamiento } from '../../types/resena';
 import { formatearHace, formatearRango, hoyIso } from '../../utils/formato';
+import type { VolverABusqueda } from './ExplorarPage';
 import { TarjetaReserva } from './TarjetaReserva';
 import './Huesped.css';
 
@@ -20,6 +21,8 @@ import './Huesped.css';
  */
 export default function AlojamientoPage() {
   const { id } = useParams();
+  const { state } = useLocation();
+  const [parametros] = useSearchParams();
   const [alojamiento, setAlojamiento] = useState<Alojamiento | null>(null);
   const [periodos, setPeriodos] = useState<PeriodoDisponible[]>([]);
   const [resenas, setResenas] = useState<ResenasAlojamiento | null>(null);
@@ -46,10 +49,12 @@ export default function AlojamientoPage() {
     };
   }, [id]);
 
+  // Desde el buscador vuelve a los mismos resultados; si se entró de otra forma, al inicio
+  const destino = (state as Partial<VolverABusqueda> | null)?.volver ?? { ruta: RUTAS.huesped, etiqueta: 'Explorar' };
   const volver = (
-    <Link to={RUTAS.huesped} className="enlace formulario__volver">
+    <Link to={destino.ruta} className="enlace formulario__volver">
       <ArrowLeft size={14} aria-hidden="true" />
-      Mis reservas
+      {destino.etiqueta}
     </Link>
   );
 
@@ -186,7 +191,15 @@ export default function AlojamientoPage() {
           </section>
         </div>
 
-        <TarjetaReserva alojamiento={a} periodos={periodosVigentes} />
+        <TarjetaReserva
+          alojamiento={a}
+          periodos={periodosVigentes}
+          inicial={{
+            llegada: parametros.get('llegada') ?? undefined,
+            salida: parametros.get('salida') ?? undefined,
+            huespedes: Number(parametros.get('huespedes')) || undefined,
+          }}
+        />
       </div>
     </>
   );

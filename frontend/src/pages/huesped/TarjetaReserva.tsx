@@ -8,7 +8,7 @@ import { mensajeParaUsuario } from '../../api/mensajes';
 import { crearReserva, estaEnProceso } from '../../api/reservas';
 import { CampoTexto } from '../../components/CampoTexto';
 import { DesgloseReserva } from '../../components/DesgloseReserva';
-import { rutaReservaHuesped } from '../../routes/rutas';
+import { rutaReservaHuesped, type DatosEstadia } from '../../routes/rutas';
 import type { Alojamiento, MotivoNoDisponible, PeriodoDisponible } from '../../types/alojamiento';
 import { NOMBRE_MODALIDAD } from '../../types/alojamiento';
 import type { Cotizacion, DatosReserva } from '../../types/reserva';
@@ -36,18 +36,20 @@ interface ErrorReserva {
 interface PropiedadesTarjetaReserva {
   alojamiento: Alojamiento;
   periodos: PeriodoDisponible[];
+  /** Fechas y huéspedes que trae el buscador, para cotizar apenas se abre. */
+  inicial?: DatosEstadia;
 }
 
 /**
  * Tarjeta lateral para elegir fechas, huéspedes y servicios adicionales, ver la cotización con su
  * desglose (MA-63, MA-64) y reservar pagando (MA-66, MA-67).
  */
-export function TarjetaReserva({ alojamiento: a, periodos }: PropiedadesTarjetaReserva) {
+export function TarjetaReserva({ alojamiento: a, periodos, inicial = {} }: PropiedadesTarjetaReserva) {
   const navegar = useNavigate();
   const hoy = hoyIso();
-  const [llegada, setLlegada] = useState('');
-  const [salida, setSalida] = useState('');
-  const [huespedes, setHuespedes] = useState('1');
+  const [llegada, setLlegada] = useState(inicial.llegada ?? '');
+  const [salida, setSalida] = useState(inicial.salida ?? '');
+  const [huespedes, setHuespedes] = useState(String(inicial.huespedes ?? 1));
   const [servicioIds, setServicioIds] = useState<number[]>([]);
   const [consulta, setConsulta] = useState<Consulta>({ tipo: 'vacia' });
   const [reservando, setReservando] = useState(false);

@@ -6,7 +6,6 @@ import { listarReservas } from '../../api/reservas';
 import { EtiquetaReserva } from '../../components/EtiquetaReserva';
 import { Miniatura } from '../../components/Miniatura';
 import { useAlojamientosDeReservas } from '../../hooks/useAlojamientosDeReservas';
-import { useAuth } from '../../auth/useAuth';
 import { rutaReservaHuesped } from '../../routes/rutas';
 import type { Reserva } from '../../types/reserva';
 import { formatearFecha, formatearPrecio, formatearRango, hoyIso } from '../../utils/formato';
@@ -23,7 +22,6 @@ function esProxima(r: Reserva, hoy: string): boolean {
 
 /** Reservas del huésped (MA-70, RF-26): próximas y anteriores, con acceso al detalle. */
 export default function MisReservasPage() {
-  const { usuario } = useAuth();
   const [reservas, setReservas] = useState<Reserva[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pestana, setPestana] = useState<Pestana>('PROXIMAS');
@@ -56,8 +54,8 @@ export default function MisReservasPage() {
     <>
       <div className="encabezado-pagina">
         <div>
-          <h1>Hola, {usuario?.nombre.split(' ')[0]}</h1>
-          <p>Tus reservas y estadías</p>
+          <h1>Mis reservas</h1>
+          <p>Tus próximas estadías y las anteriores</p>
         </div>
       </div>
 

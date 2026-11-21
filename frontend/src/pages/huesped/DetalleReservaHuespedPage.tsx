@@ -8,7 +8,7 @@ import { DesgloseReserva } from '../../components/DesgloseReserva';
 import { EtiquetaReserva } from '../../components/EtiquetaReserva';
 import { FormularioMotivo } from '../../components/FormularioMotivo';
 import { Miniatura } from '../../components/Miniatura';
-import { RUTAS, rutaAlojamientoHuesped } from '../../routes/rutas';
+import { RUTAS, rutaAlojamientoHuesped, rutaReservaHuesped } from '../../routes/rutas';
 import type { Alojamiento } from '../../types/alojamiento';
 import type { Reserva } from '../../types/reserva';
 import { formatearFecha, formatearHace, formatearPrecio } from '../../utils/formato';
@@ -55,7 +55,7 @@ export default function DetalleReservaHuespedPage() {
   }, [id, recargas]);
 
   const volver = (
-    <Link to={RUTAS.huesped} className="enlace formulario__volver">
+    <Link to={RUTAS.misReservas} className="enlace formulario__volver">
       <ArrowLeft size={14} aria-hidden="true" />
       Mis reservas
     </Link>
@@ -122,7 +122,11 @@ export default function DetalleReservaHuespedPage() {
                 {alojamiento && (
                   <div className="campo__ayuda">
                     {alojamiento.ciudad.nombre}, {alojamiento.ciudad.departamento} ·{' '}
-                    <Link to={rutaAlojamientoHuesped(alojamiento.id)} className="enlace">
+                    <Link
+                      to={rutaAlojamientoHuesped(alojamiento.id)}
+                      state={{ volver: { ruta: rutaReservaHuesped(r.id), etiqueta: `Reserva #${r.id}` } }}
+                      className="enlace"
+                    >
                       Ver alojamiento
                     </Link>
                   </div>

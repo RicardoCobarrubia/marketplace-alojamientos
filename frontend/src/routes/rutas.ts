@@ -5,6 +5,7 @@ export const RUTAS = {
   registro: '/registro',
   recuperarContrasena: '/recuperar-contrasena',
   huesped: '/huesped',
+  misReservas: '/huesped/reservas',
   anfitrion: '/anfitrion',
   nuevoAlojamiento: '/anfitrion/alojamientos/nuevo',
   disponibilidad: '/anfitrion/disponibilidad',
@@ -62,7 +63,21 @@ export function rutaReservaHuesped(id: number): string {
   return `${RUTAS.huesped}/reservas/${id}`;
 }
 
+/** Fechas y huéspedes que se pasan del buscador al detalle para cotizar de una vez. */
+export interface DatosEstadia {
+  llegada?: string;
+  salida?: string;
+  huespedes?: number;
+}
+
 /** Detalle de un alojamiento publicado, desde donde el huésped cotiza y reserva. */
-export function rutaAlojamientoHuesped(id: number): string {
-  return `${RUTAS.huesped}/alojamientos/${id}`;
+export function rutaAlojamientoHuesped(id: number, estadia: DatosEstadia = {}): string {
+  const parametros = new URLSearchParams();
+  if (estadia.llegada && estadia.salida) {
+    parametros.set('llegada', estadia.llegada);
+    parametros.set('salida', estadia.salida);
+  }
+  if (estadia.huespedes) parametros.set('huespedes', String(estadia.huespedes));
+  const consulta = parametros.toString();
+  return `${RUTAS.huesped}/alojamientos/${id}${consulta ? `?${consulta}` : ''}`;
 }
