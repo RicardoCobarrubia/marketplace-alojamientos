@@ -24,7 +24,7 @@ import DetalleReservaHuespedPage from './pages/huesped/DetalleReservaHuespedPage
 import ExplorarPage from './pages/huesped/ExplorarPage';
 import LayoutHuesped from './pages/huesped/LayoutHuesped';
 import MisReservasPage from './pages/huesped/MisReservasPage';
-import PaginaPendiente from './pages/provisionales/PaginaPendiente';
+import RecuperarContrasenaPage from './pages/recuperar/RecuperarContrasenaPage';
 import RegistroPage from './pages/registro/RegistroPage';
 import { RedireccionInicial, RutaProtegida, SoloInvitados } from './routes/Guardias';
 import { RUTAS } from './routes/rutas';
@@ -37,7 +37,7 @@ export default function App() {
       <Route element={<SoloInvitados />}>
         <Route path={RUTAS.login} element={<LoginPage />} />
         <Route path={RUTAS.registro} element={<RegistroPage />} />
-        <Route path={RUTAS.recuperarContrasena} element={<PaginaPendiente titulo="Recuperar contraseña" />} />
+        <Route path={RUTAS.recuperarContrasena} element={<RecuperarContrasenaPage />} />
       </Route>
 
       <Route element={<RutaProtegida roles={['HUESPED']} />}>
