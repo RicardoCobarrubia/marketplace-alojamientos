@@ -27,3 +27,24 @@ export function reactivarCuenta(credenciales: Credenciales): Promise<RespuestaLo
     autenticado: false,
   });
 }
+
+/**
+ * POST /api/auth/recuperacion (MA-50, escenario 1): pide un código de 6 dígitos que llega al
+ * correo y vence en 15 minutos. Responde lo mismo exista o no la cuenta.
+ */
+export function solicitarCodigoRecuperacion(email: string): Promise<{ mensaje: string }> {
+  return peticion<{ mensaje: string }>('/api/auth/recuperacion', {
+    metodo: 'POST',
+    cuerpo: { email },
+    autenticado: false,
+  });
+}
+
+/** POST /api/auth/recuperacion/confirmacion (MA-50, escenario 2): define la nueva contraseña con el código. */
+export function restablecerContrasena(email: string, codigo: string, password: string): Promise<void> {
+  return peticion<void>('/api/auth/recuperacion/confirmacion', {
+    metodo: 'POST',
+    cuerpo: { email, codigo, password },
+    autenticado: false,
+  });
+}

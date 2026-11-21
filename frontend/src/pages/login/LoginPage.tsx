@@ -146,7 +146,7 @@ export default function LoginPage() {
           accesorio={<BotonVerContrasena visible={verPassword} alCambiar={() => setVerPassword((v) => !v)} />}
         />
 
-        <Link to={RUTAS.recuperarContrasena} className="enlace login__olvido">
+        <Link to={RUTAS.recuperarContrasena} state={{ email: email.trim() }} className="enlace login__olvido">
           ¿Olvidaste tu contraseña?
         </Link>
 
