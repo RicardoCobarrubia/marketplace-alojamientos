@@ -9,6 +9,7 @@ import type {
   ResultadoModeracion,
 } from '../types/admin';
 import type { Reserva } from '../types/reserva';
+import { peticion, peticionArchivo } from './cliente';
 import { peticion } from './cliente';
 
 /** Endpoints del administrador (/api/admin/**). */
@@ -138,4 +139,22 @@ export function obtenerConfiguracionCotizacion(): Promise<ConfiguracionCotizacio
 
 export function actualizarConfiguracionCotizacion(datos: ConfiguracionCotizacion): Promise<ConfiguracionCotizacion> {
   return peticion<ConfiguracionCotizacion>('/api/admin/configuracion/cotizacion', { metodo: 'PUT', cuerpo: datos });
+}
+
+// ─── Reportes de gestión (MA-85, MA-86) ─────────────────
+
+export type FormatoReporte = 'PDF' | 'EXCEL';
+
+/**
+ * Genera el reporte de gestión del periodo (máximo 366 días) y lo devuelve como archivo. El
+ * backend registra en la auditoría quién lo pidió y cuándo.
+ */
+export function exportarReporte(formato: FormatoReporte, desde: string, hasta: string): Promise<Blob> {
+  const parametros = new URLSearchParams({ formato, desde, hasta });
+  return peticionArchivo(`/api/admin/reportes?${parametros}`);
+}
+
+/** Mismo nombre que arma el backend: el navegador no puede leer Content-Disposition por CORS. */
+export function nombreReporte(formato: FormatoReporte, desde: string, hasta: string): string {
+  return `reporte-gestion-${desde}-a-${hasta}.${formato === 'PDF' ? 'pdf' : 'xlsx'}`;
 }

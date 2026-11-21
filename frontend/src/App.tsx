@@ -7,6 +7,7 @@ import DetallePublicacionPage from './pages/admin/DetallePublicacionPage';
 import LayoutAdmin from './pages/admin/LayoutAdmin';
 import PanelAdminPage from './pages/admin/PanelAdminPage';
 import ResenasAdminPage from './pages/admin/ResenasAdminPage';
+import ReportesPage from './pages/admin/ReportesPage';
 import ReservasRevisionPage from './pages/admin/ReservasRevisionPage';
 import RevisionPublicacionesPage from './pages/admin/RevisionPublicacionesPage';
 import TarifasPage from './pages/admin/TarifasPage';
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="resenas" element={<ResenasAdminPage />} />
           <Route path="tarifas" element={<TarifasPage />} />
           <Route path="auditoria" element={<AuditoriaPage />} />
+          <Route path="reportes" element={<ReportesPage />} />
         </Route>
       </Route>
 

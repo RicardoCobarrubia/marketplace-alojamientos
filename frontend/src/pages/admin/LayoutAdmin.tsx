@@ -70,6 +70,7 @@ export default function LayoutAdmin() {
     { etiqueta: 'Reservas en revisión', icono: TriangleAlert, ruta: RUTAS.adminReservasRevision, contador: reservasEnRevision },
     { etiqueta: 'Reseñas', icono: ClipboardList, ruta: RUTAS.adminResenas },
     { etiqueta: 'Tarifas', icono: CreditCard, ruta: RUTAS.adminTarifas },
+    { etiqueta: 'Reportes', icono: Download, ruta: RUTAS.adminReportes },
     { etiqueta: 'Reportes', icono: Download },
     { etiqueta: 'Auditoría', icono: FileText, ruta: RUTAS.adminAuditoria },
   ];

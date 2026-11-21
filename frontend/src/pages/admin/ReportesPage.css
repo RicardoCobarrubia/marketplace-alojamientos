@@ -1,0 +1,85 @@
+.reportes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.reportes__grupo {
+  min-width: 0;
+  margin: 0 0 22px;
+  padding: 0;
+  border: 0;
+}
+
+.reportes__formatos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.reportes__formato {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  color: var(--color-texto-suave);
+  cursor: pointer;
+}
+
+.reportes__formato strong {
+  display: block;
+  color: var(--color-texto);
+  font-size: 0.9rem;
+}
+
+.reportes__formato-detalle {
+  display: block;
+  font-size: 0.76rem;
+}
+
+.reportes__formato--activo {
+  background: #faf5ec;
+  border-color: var(--color-cafe);
+  box-shadow: inset 0 0 0 1px var(--color-cafe);
+  color: var(--color-cafe);
+}
+
+.reportes__formato:focus-within {
+  box-shadow: var(--sombra-foco);
+}
+
+.reportes__fechas {
+  margin-top: 14px;
+}
+
+.reportes__fechas .campo {
+  margin-bottom: 6px;
+}
+
+.reportes__resumen {
+  margin: 0;
+}
+
+.reportes__contenido {
+  background: #faf6ef;
+}
+
+.reportes__contenido .lista-chequeo {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+  .reportes {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .reportes__formatos {
+    grid-template-columns: 1fr;
+  }
+}

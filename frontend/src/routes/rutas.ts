@@ -17,6 +17,7 @@ export const RUTAS = {
   adminResenas: '/admin/resenas',
   adminTarifas: '/admin/tarifas',
   adminAuditoria: '/admin/auditoria',
+  adminReportes: '/admin/reportes',
 } as const;
 
 export function rutaEditarAlojamiento(id: number): string {
