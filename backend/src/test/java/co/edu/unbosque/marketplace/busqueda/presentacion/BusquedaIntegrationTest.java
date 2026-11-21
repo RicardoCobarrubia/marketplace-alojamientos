@@ -127,6 +127,15 @@ class BusquedaIntegrationTest {
 				.andExpect(jsonPath("$.alojamientos[*].titulo", contains("Básica", "Grande")));
 		buscar(get(RUTA).param("ciudadId", "2").param("servicioIds", "1").param("servicioIds", "2"))
 				.andExpect(jsonPath("$.alojamientos[*].titulo", contains("Grande")));
+		// Combinados: deben cumplirse todos a la vez
+		buscar(get(RUTA).param("ciudadId", "2").param("huespedes", "6").param("tipoId", "1"))
+				.andExpect(jsonPath("$.alojamientos", empty()));
+		buscar(get(RUTA).param("ciudadId", "2").param("huespedes", "4").param("tipoId", "3")
+				.param("precioMax", "300000").param("servicioIds", "1"))
+				.andExpect(jsonPath("$.alojamientos[*].titulo", contains("Básica")));
+		buscar(get(RUTA).param("ciudadId", "2").param("huespedes", "6").param("tipoId", "3")
+				.param("precioMin", "400000").param("servicioIds", "2"))
+				.andExpect(jsonPath("$.alojamientos[*].titulo", contains("Grande")));
 		buscar(get(RUTA).param("ciudadId", "2").param("tamano", "2").param("pagina", "1"))
 				.andExpect(jsonPath("$.alojamientos[*].titulo", contains("Grande")))
 				.andExpect(jsonPath("$.total").value(3))
