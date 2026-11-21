@@ -53,3 +53,7 @@ export function rutaNotificaciones(rol: Rol): string {
 export function rutaPerfil(rol: Rol): string {
   return `${rutaInicio(rol)}/perfil`;
 }
+
+export function rutaDetalleReservaAnfitrion(id: number): string {
+  return `${RUTAS.reservasRecibidas}/${id}`;
+}

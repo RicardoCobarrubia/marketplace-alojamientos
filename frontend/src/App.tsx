@@ -15,6 +15,7 @@ import DisponibilidadPage from './pages/anfitrion/disponibilidad/DisponibilidadP
 import FormularioAlojamientoPage from './pages/anfitrion/formulario/FormularioAlojamientoPage';
 import LayoutAnfitrion from './pages/anfitrion/LayoutAnfitrion';
 import MisAlojamientosPage from './pages/anfitrion/MisAlojamientosPage';
+import DetalleReservaPage from './pages/anfitrion/DetalleReservaPage';
 import ReservasRecibidasPage from './pages/anfitrion/ReservasRecibidasPage';
 import NotificacionesPage from './pages/comunes/NotificacionesPage';
 import PerfilPage from './pages/comunes/PerfilPage';
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="alojamientos/:id/editar" element={<FormularioAlojamientoPage key="editar" />} />
           <Route path="disponibilidad" element={<DisponibilidadPage />} />
           <Route path="reservas" element={<ReservasRecibidasPage />} />
+          <Route path="reservas/:id" element={<DetalleReservaPage />} />
           <Route path="notificaciones" element={<NotificacionesPage />} />
           <Route path="perfil" element={<PerfilPage />} />
         </Route>
