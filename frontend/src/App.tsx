@@ -16,6 +16,8 @@ import FormularioAlojamientoPage from './pages/anfitrion/formulario/FormularioAl
 import LayoutAnfitrion from './pages/anfitrion/LayoutAnfitrion';
 import MisAlojamientosPage from './pages/anfitrion/MisAlojamientosPage';
 import ReservasRecibidasPage from './pages/anfitrion/ReservasRecibidasPage';
+import NotificacionesPage from './pages/comunes/NotificacionesPage';
+import PerfilPage from './pages/comunes/PerfilPage';
 import LoginPage from './pages/login/LoginPage';
 import InicioProvisional from './pages/provisionales/InicioProvisional';
 import PaginaPendiente from './pages/provisionales/PaginaPendiente';
@@ -37,6 +39,8 @@ export default function App() {
       <Route element={<RutaProtegida roles={['HUESPED']} />}>
         <Route path={RUTAS.huesped} element={<LayoutApp />}>
           <Route index element={<InicioProvisional />} />
+          <Route path="notificaciones" element={<NotificacionesPage />} />
+          <Route path="perfil" element={<PerfilPage />} />
         </Route>
       </Route>
 
@@ -47,6 +51,8 @@ export default function App() {
           <Route path="alojamientos/:id/editar" element={<FormularioAlojamientoPage key="editar" />} />
           <Route path="disponibilidad" element={<DisponibilidadPage />} />
           <Route path="reservas" element={<ReservasRecibidasPage />} />
+          <Route path="notificaciones" element={<NotificacionesPage />} />
+          <Route path="perfil" element={<PerfilPage />} />
         </Route>
       </Route>
 
@@ -62,6 +68,8 @@ export default function App() {
           <Route path="tarifas" element={<TarifasPage />} />
           <Route path="auditoria" element={<AuditoriaPage />} />
           <Route path="reportes" element={<ReportesPage />} />
+          <Route path="notificaciones" element={<NotificacionesPage />} />
+          <Route path="perfil" element={<PerfilPage />} />
         </Route>
       </Route>
 

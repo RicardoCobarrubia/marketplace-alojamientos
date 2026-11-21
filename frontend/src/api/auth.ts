@@ -18,3 +18,12 @@ export function iniciarSesion(credenciales: Credenciales): Promise<RespuestaLogi
     autenticado: false,
   });
 }
+
+/** POST /api/auth/reactivacion (MA-52): reactiva una cuenta desactivada y devuelve el token. */
+export function reactivarCuenta(credenciales: Credenciales): Promise<RespuestaLogin> {
+  return peticion<RespuestaLogin>('/api/auth/reactivacion', {
+    metodo: 'POST',
+    cuerpo: credenciales,
+    autenticado: false,
+  });
+}

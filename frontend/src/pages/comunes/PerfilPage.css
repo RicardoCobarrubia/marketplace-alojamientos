@@ -1,0 +1,38 @@
+.perfil {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+.perfil__botones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.perfil__peligro {
+  border-color: var(--color-error-borde);
+}
+
+.perfil__consecuencias {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding-left: 18px;
+  color: var(--color-texto-suave);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.perfil__confirmacion p {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .perfil {
+    grid-template-columns: 1fr;
+  }
+}

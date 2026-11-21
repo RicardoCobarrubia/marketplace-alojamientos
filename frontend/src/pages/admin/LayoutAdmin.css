@@ -173,3 +173,14 @@ button.admin__item:hover {
     padding-right: 0;
   }
 }
+
+a.admin__usuario {
+  padding: 2px 10px 2px 2px;
+  border-radius: 999px;
+  color: var(--color-texto);
+  text-decoration: none;
+}
+
+a.admin__usuario:hover {
+  background: var(--color-superficie);
+}

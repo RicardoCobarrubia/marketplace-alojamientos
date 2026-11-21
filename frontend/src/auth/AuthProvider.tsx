@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { iniciarSesion as solicitarLogin } from '../api/auth';
-import type { Credenciales } from '../types/auth';
+import { reactivarCuenta as solicitarReactivacion, iniciarSesion as solicitarLogin } from '../api/auth';
+import type { Credenciales, RespuestaLogin, Usuario } from '../types/auth';
 import { AuthContext, type ValorAuth } from './contexto';
 import {
   borrarSesion,
@@ -22,8 +22,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSesion(null);
   }, []);
 
-  const iniciarSesion = useCallback(async (credenciales: Credenciales) => {
-    const respuesta = await solicitarLogin(credenciales);
+  /** Guarda la sesión que devuelve el login o la reactivación. */
+  const abrirSesion = useCallback((respuesta: RespuestaLogin) => {
     const nueva: Sesion = {
       token: respuesta.token,
       expiraEn: respuesta.expiraEn,
@@ -32,6 +32,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     guardarSesion(nueva);
     setSesion(nueva);
     return respuesta.usuario;
+  }, []);
+
+  const iniciarSesion = useCallback(
+    async (credenciales: Credenciales) => abrirSesion(await solicitarLogin(credenciales)),
+    [abrirSesion],
+  );
+
+  const reactivarCuenta = useCallback(
+    async (credenciales: Credenciales) => abrirSesion(await solicitarReactivacion(credenciales)),
+    [abrirSesion],
+  );
+
+  const actualizarUsuario = useCallback((usuario: Usuario) => {
+    setSesion((actual) => {
+      if (!actual) return actual;
+      const nueva = { ...actual, usuario };
+      guardarSesion(nueva);
+      return nueva;
+    });
   }, []);
 
   // Cierra la sesión cuando el backend rechaza el token o cuando se cierra en otra pestaña.
@@ -57,8 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [sesion, cerrarSesion]);
 
   const valor = useMemo<ValorAuth>(
-    () => ({ sesion, usuario: sesion?.usuario ?? null, iniciarSesion, cerrarSesion }),
-    [sesion, iniciarSesion, cerrarSesion],
+    () => ({
+      sesion,
+      usuario: sesion?.usuario ?? null,
+      iniciarSesion,
+      reactivarCuenta,
+      actualizarUsuario,
+      cerrarSesion,
+    }),
+    [sesion, iniciarSesion, reactivarCuenta, actualizarUsuario, cerrarSesion],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

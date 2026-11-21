@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import {
   Bell,
   ChartColumn,
@@ -19,7 +19,8 @@ import {
 import { listarAlojamientosAdmin, listarReservasEnRevision } from '../../api/admin';
 import { useAuth } from '../../auth/useAuth';
 import { Logo } from '../../components/Logo';
-import { RUTAS } from '../../routes/rutas';
+import { useNotificaciones } from '../../hooks/useNotificaciones';
+import { RUTAS, rutaNotificaciones, rutaPerfil } from '../../routes/rutas';
 import './LayoutAdmin.css';
 
 interface ItemMenu {
@@ -46,6 +47,7 @@ export default function LayoutAdmin() {
   const { pathname } = useLocation();
   const [pendientes, setPendientes] = useState<number | undefined>();
   const [reservasEnRevision, setReservasEnRevision] = useState<number | undefined>();
+  const { noLeidas } = useNotificaciones();
 
   // Se recalculan al navegar para que los contadores bajen después de cada decisión.
   useEffect(() => {
@@ -85,8 +87,10 @@ export default function LayoutAdmin() {
           ))}
         </nav>
         <div className="admin__pie">
-          <ElementoMenu item={{ etiqueta: 'Notificaciones', icono: Bell }} />
-          <ElementoMenu item={{ etiqueta: 'Mi perfil', icono: UserRound }} />
+          <ElementoMenu
+            item={{ etiqueta: 'Notificaciones', icono: Bell, ruta: rutaNotificaciones('ADMINISTRADOR'), contador: noLeidas }}
+          />
+          <ElementoMenu item={{ etiqueta: 'Mi perfil', icono: UserRound, ruta: rutaPerfil('ADMINISTRADOR') }} />
           <button type="button" className="admin__item" onClick={cerrarSesion}>
             <LogOut size={16} aria-hidden="true" />
             <span>Cerrar sesión</span>
@@ -96,12 +100,12 @@ export default function LayoutAdmin() {
 
       <div className="admin__contenedor">
         {usuario && (
-          <div className="admin__usuario">
+          <Link to={rutaPerfil('ADMINISTRADOR')} className="admin__usuario" title="Mi perfil">
             <span className="avatar" aria-hidden="true">
               {iniciales(usuario.nombre)}
             </span>
             <span>{usuario.nombre}</span>
-          </div>
+          </Link>
         )}
         <main className="admin__contenido">
           <Outlet />

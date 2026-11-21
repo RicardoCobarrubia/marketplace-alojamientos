@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { CircleAlert, LoaderCircle, Lock, Mail } from 'lucide-react';
+import { CircleAlert, Info, LoaderCircle, Lock, Mail } from 'lucide-react';
 import { ApiError } from '../../api/ApiError';
 import { mensajeParaUsuario } from '../../api/mensajes';
+import { tomarAvisoLogin } from '../../auth/sesion';
 import { useAuth } from '../../auth/useAuth';
 import { BotonVerContrasena } from '../../components/BotonVerContrasena';
 import { CampoTexto } from '../../components/CampoTexto';
@@ -35,13 +36,18 @@ function interpretarError(error: unknown): { campos: ErroresCampos; general: str
 }
 
 export default function LoginPage() {
-  const { iniciarSesion } = useAuth();
+  const { iniciarSesion, reactivarCuenta } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [verPassword, setVerPassword] = useState(false);
   const [errores, setErrores] = useState<ErroresCampos>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  /** Aviso que dejó otra página, por ejemplo al desactivar la cuenta. Se lee una sola vez. */
+  const [aviso] = useState(tomarAvisoLogin);
+  /** El backend respondió CUENTA_DESACTIVADA: se ofrece reactivarla (MA-52, RF-06). */
+  const [cuentaDesactivada, setCuentaDesactivada] = useState(false);
+  const [reactivando, setReactivando] = useState(false);
 
   async function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -50,6 +56,7 @@ export default function LoginPage() {
     const validacion = validar(email, password);
     setErrores(validacion);
     setErrorGeneral(null);
+    setCuentaDesactivada(false);
     if (validacion.email || validacion.password) return;
 
     setEnviando(true);
@@ -60,7 +67,21 @@ export default function LoginPage() {
       const { campos, general } = interpretarError(error);
       setErrores(campos);
       setErrorGeneral(general);
+      setCuentaDesactivada(error instanceof ApiError && error.codigo === 'CUENTA_DESACTIVADA');
       setEnviando(false);
+    }
+  }
+
+  async function reactivar() {
+    setReactivando(true);
+    setErrorGeneral(null);
+    try {
+      // Mismas credenciales que acaba de escribir; al guardar la sesión la guardia redirige.
+      await reactivarCuenta({ email: email.trim(), password });
+    } catch (error) {
+      setErrorGeneral(mensajeParaUsuario(error));
+      setCuentaDesactivada(false);
+      setReactivando(false);
     }
   }
 
@@ -70,10 +91,30 @@ export default function LoginPage() {
       <p className="autenticacion__instruccion">Ingresa con tu correo para continuar.</p>
 
       <form onSubmit={manejarEnvio} noValidate>
-        {errorGeneral && (
+        {aviso && !errorGeneral && (
+          <div className="alerta alerta--info" role="status">
+            <Info size={16} aria-hidden="true" />
+            <span>{aviso}</span>
+          </div>
+        )}
+
+        {errorGeneral && !cuentaDesactivada && (
           <div className="alerta alerta--error" role="alert">
             <CircleAlert size={16} aria-hidden="true" />
             <span>{errorGeneral}</span>
+          </div>
+        )}
+
+        {cuentaDesactivada && (
+          <div className="alerta alerta--aviso login__reactivar" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
+            <div>
+              <p>Tu cuenta está desactivada. ¿Quieres reactivarla y entrar?</p>
+              <button type="button" className="boton boton--primario boton--pequeno" onClick={reactivar} disabled={reactivando}>
+                {reactivando && <LoaderCircle size={14} className="girando" aria-hidden="true" />}
+                {reactivando ? 'Reactivando…' : 'Reactivar mi cuenta'}
+              </button>
+            </div>
           </div>
         )}
 
