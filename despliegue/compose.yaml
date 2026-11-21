@@ -93,6 +93,12 @@ services:
       # La regla más general va al final: /api siempre gana
       - traefik.http.routers.web.priority=1
       - traefik.http.services.frontend.loadbalancer.server.port=80
+      # Si no queda ninguna réplica del backend, Traefik retira el router "api" y /api cae aquí:
+      # nginx responde 503 y el tablero lo cuenta como error de la API
+      - traefik.http.routers.api-respaldo.rule=PathPrefix(`/api`)
+      - traefik.http.routers.api-respaldo.entrypoints=web
+      - traefik.http.routers.api-respaldo.priority=2
+      - traefik.http.routers.api-respaldo.service=frontend
     restart: unless-stopped
 
   postgres:
