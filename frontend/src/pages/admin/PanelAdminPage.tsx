@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ChevronRight, CircleAlert, ListChecks, LoaderCircle, TriangleAlert } from 'lucide-react';
+import { ChevronRight, CircleAlert, Download, ListChecks, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { listarAlojamientosAdmin, obtenerIndicadores, obtenerIngresos } from '../../api/admin';
 import { mensajeParaUsuario } from '../../api/mensajes';
 import { CampoSeleccion } from '../../components/CampoSeleccion';
@@ -90,13 +90,19 @@ export default function PanelAdminPage() {
             {ingresos && ` · ${formatearFecha(ingresos.desde)} – ${formatearFecha(ingresos.hasta)}`}
           </p>
         </div>
-        <div className="panel__rango">
-          <CampoSeleccion
-            etiqueta="Periodo de ingresos"
-            opciones={RANGOS.map((r) => ({ valor: r.dias, etiqueta: r.etiqueta }))}
-            value={dias}
-            onChange={(e) => setDias(Number(e.target.value))}
-          />
+        <div className="panel__acciones">
+          <div className="panel__rango">
+            <CampoSeleccion
+              etiqueta="Periodo de ingresos"
+              opciones={RANGOS.map((r) => ({ valor: r.dias, etiqueta: r.etiqueta }))}
+              value={dias}
+              onChange={(e) => setDias(Number(e.target.value))}
+            />
+          </div>
+          <Link to={`${RUTAS.adminReportes}?dias=${dias}`} className="boton boton--primario panel__exportar">
+            <Download size={16} aria-hidden="true" />
+            Exportar reportes
+          </Link>
         </div>
       </div>
 
