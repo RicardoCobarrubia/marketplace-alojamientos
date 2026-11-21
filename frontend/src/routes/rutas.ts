@@ -43,3 +43,13 @@ export function rutaInicio(rol: Rol): string {
       return RUTAS.admin;
   }
 }
+
+/** Página de notificaciones del rol: /huesped/notificaciones, /anfitrion/notificaciones... */
+export function rutaNotificaciones(rol: Rol): string {
+  return `${rutaInicio(rol)}/notificaciones`;
+}
+
+/** Página "Mi perfil" del rol. */
+export function rutaPerfil(rol: Rol): string {
+  return `${rutaInicio(rol)}/perfil`;
+}

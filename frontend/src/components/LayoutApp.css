@@ -122,3 +122,17 @@
     padding: 28px 16px 48px;
   }
 }
+
+.barra-superior__perfil {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  color: var(--color-texto);
+  text-decoration: none;
+}
+
+.barra-superior__perfil:hover {
+  background: var(--color-fondo);
+}

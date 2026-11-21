@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { Link, NavLink, Outlet } from 'react-router';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
+import { rutaNotificaciones, rutaPerfil } from '../routes/rutas';
+import { CampanaNotificaciones } from './CampanaNotificaciones';
 import { Logo } from './Logo';
 import './LayoutApp.css';
 
@@ -56,10 +58,13 @@ export function LayoutApp({ navegacion = [], accion }: PropiedadesLayoutApp) {
           {accion}
           {usuario && (
             <>
-              <span className="avatar" aria-hidden="true">
-                {iniciales(usuario.nombre)}
-              </span>
-              <span className="barra-superior__nombre">{usuario.nombre}</span>
+              <CampanaNotificaciones rutaTodas={rutaNotificaciones(usuario.rol)} />
+              <Link to={rutaPerfil(usuario.rol)} className="barra-superior__perfil" title="Mi perfil">
+                <span className="avatar" aria-hidden="true">
+                  {iniciales(usuario.nombre)}
+                </span>
+                <span className="barra-superior__nombre">{usuario.nombre}</span>
+              </Link>
             </>
           )}
           <button

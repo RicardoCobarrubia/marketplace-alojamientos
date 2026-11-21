@@ -58,3 +58,28 @@ export function esClaveSesion(clave: string | null): boolean {
 export function notificarSesionPerdida(): void {
   window.dispatchEvent(new Event(EVENTO_SESION_PERDIDA));
 }
+
+const CLAVE_AVISO_LOGIN = 'lr.aviso-login';
+
+/**
+ * Deja un mensaje para mostrar en el login, por ejemplo después de desactivar la cuenta. Se usa
+ * sessionStorage porque al cerrar la sesión las guardias redirigen solas al login.
+ */
+export function dejarAvisoLogin(mensaje: string): void {
+  try {
+    sessionStorage.setItem(CLAVE_AVISO_LOGIN, mensaje);
+  } catch {
+    // Sin almacenamiento el aviso simplemente no se muestra.
+  }
+}
+
+/** Lee el aviso pendiente del login y lo borra para que salga una sola vez. */
+export function tomarAvisoLogin(): string | null {
+  try {
+    const mensaje = sessionStorage.getItem(CLAVE_AVISO_LOGIN);
+    sessionStorage.removeItem(CLAVE_AVISO_LOGIN);
+    return mensaje;
+  } catch {
+    return null;
+  }
+}
