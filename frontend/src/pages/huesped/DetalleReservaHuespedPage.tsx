@@ -22,6 +22,8 @@ const FECHA_HORA = new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeSty
 /** Lo que llega en el state de la navegación después de reservar o cancelar. */
 interface AvisoNavegacion {
   recienReservada?: boolean;
+  /** "Visa terminada en 4242": la tarjeta con la que se pagó en la ventana de pago simulado. */
+  medioPago?: string;
 }
 
 /**
@@ -98,7 +100,7 @@ export default function DetalleReservaHuespedPage() {
       {state?.recienReservada && r.estado === 'CONFIRMADA' && (
         <div className="alerta alerta--exito" role="status">
           <CircleCheck size={16} aria-hidden="true" />
-          <span>¡Listo! Tu reserva quedó confirmada y el pago fue aprobado.</span>
+          <span>¡Listo! Tu reserva quedó confirmada y el pago fue aprobado{state.medioPago ? ` con tu ${state.medioPago}` : ''}.</span>
         </div>
       )}
 
