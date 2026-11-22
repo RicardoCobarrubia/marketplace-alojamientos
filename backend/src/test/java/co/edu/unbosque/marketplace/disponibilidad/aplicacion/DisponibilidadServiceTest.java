@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
@@ -60,7 +61,8 @@ class DisponibilidadServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new DisponibilidadService(alojamientoRepository, periodoRepository, reservadoRepository,
+		servicio = new DisponibilidadService(ServiciosDePrueba.alojamientos(alojamientoRepository),
+				periodoRepository, reservadoRepository,
 				Clock.fixed(AHORA, BOGOTA), BOGOTA);
 		alojamiento = TestDatos.alojamiento(10L, dueno);
 		TestDatos.asignar(alojamiento, "estado", EstadoAlojamiento.ACTIVA);

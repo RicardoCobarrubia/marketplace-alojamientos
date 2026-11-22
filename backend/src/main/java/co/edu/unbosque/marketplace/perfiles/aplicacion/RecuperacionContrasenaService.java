@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 
+import co.edu.unbosque.marketplace.usuarios.aplicacion.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -26,7 +27,6 @@ import co.edu.unbosque.marketplace.perfiles.dominio.CodigoRecuperacion;
 import co.edu.unbosque.marketplace.perfiles.infraestructura.CodigoRecuperacionRepository;
 import co.edu.unbosque.marketplace.usuarios.aplicacion.SesionesEnCache;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
-import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 import jakarta.annotation.PreDestroy;
 
 /**
@@ -53,7 +53,7 @@ public class RecuperacionContrasenaService {
 	static final int SOLICITUDES_SIMULTANEAS = 4;
 
 	private final EmisionCodigos emision;
-	private final UsuarioRepository usuarios;
+	private final UsuarioService usuarioService;
 	private final CodigoRecuperacionRepository codigos;
 	private final PasswordEncoder passwordEncoder;
 	private final EnvioCorreo correo;
@@ -65,11 +65,11 @@ public class RecuperacionContrasenaService {
 	private final ExecutorService envios = Executors.newVirtualThreadPerTaskExecutor();
 	private final Semaphore cupos = new Semaphore(SOLICITUDES_SIMULTANEAS);
 
-	public RecuperacionContrasenaService(EmisionCodigos emision, UsuarioRepository usuarios,
+	public RecuperacionContrasenaService(EmisionCodigos emision, UsuarioService usuarioService,
 			CodigoRecuperacionRepository codigos, PasswordEncoder passwordEncoder, EnvioCorreo correo,
 			SesionesEnCache sesiones, Auditoria auditoria, Clock reloj) {
 		this.emision = emision;
-		this.usuarios = usuarios;
+		this.usuarioService = usuarioService;
 		this.codigos = codigos;
 		this.passwordEncoder = passwordEncoder;
 		this.correo = correo;
@@ -122,8 +122,8 @@ public class RecuperacionContrasenaService {
 					"La contraseña es demasiado larga; usa menos caracteres especiales.");
 		}
 		Instant ahora = reloj.instant();
-		Optional<Usuario> registrado = usuarios.findByEmail(Usuario.normalizarEmail(solicitud.email()))
-				.flatMap(encontrado -> usuarios.buscarParaActualizar(encontrado.getId()));
+		Optional<Usuario> registrado = usuarioService.buscarPorEmail(solicitud.email())
+				.flatMap(encontrado -> usuarioService.buscarParaActualizar(encontrado.getId()));
 		Optional<CodigoRecuperacion> vigente = registrado
 				.flatMap(usuario -> codigos.findFirstByUsuarioIdOrderByIdDesc(usuario.getId()))
 				.filter(ultimo -> ultimo.sirve(ahora));

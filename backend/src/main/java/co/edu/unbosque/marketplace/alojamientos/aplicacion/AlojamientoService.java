@@ -6,10 +6,15 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
+import co.edu.unbosque.marketplace.usuarios.aplicacion.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +40,6 @@ import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
-import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 
 /**
  * Publicación y administración de alojamientos (MA-53 a MA-57).
@@ -52,7 +56,7 @@ public class AlojamientoService {
 
 	private final AlojamientoRepository alojamientoRepository;
 	private final ServicioAdicionalRepository servicioAdicionalRepository;
-	private final UsuarioRepository usuarioRepository;
+	private final UsuarioService usuarioService;
 	private final CiudadRepository ciudadRepository;
 	private final TipoAlojamientoRepository tipoRepository;
 	private final ServicioRepository servicioRepository;
@@ -62,13 +66,13 @@ public class AlojamientoService {
 	private final Clock reloj;
 
 	public AlojamientoService(AlojamientoRepository alojamientoRepository,
-			ServicioAdicionalRepository servicioAdicionalRepository, UsuarioRepository usuarioRepository,
+			ServicioAdicionalRepository servicioAdicionalRepository, UsuarioService usuarioService,
 			CiudadRepository ciudadRepository, TipoAlojamientoRepository tipoRepository,
 			ServicioRepository servicioRepository, PoliticaCancelacionRepository politicaRepository,
 			PublicadorEventos publicador, Auditoria auditoria, Clock reloj) {
 		this.alojamientoRepository = alojamientoRepository;
 		this.servicioAdicionalRepository = servicioAdicionalRepository;
-		this.usuarioRepository = usuarioRepository;
+		this.usuarioService = usuarioService;
 		this.ciudadRepository = ciudadRepository;
 		this.tipoRepository = tipoRepository;
 		this.servicioRepository = servicioRepository;
@@ -78,6 +82,37 @@ public class AlojamientoService {
 		this.reloj = reloj;
 	}
 
+	// ---- Lo que el módulo de alojamientos ofrece a los demás módulos (ADR-001) ----
+	// Sin @Transactional propio: se unen a la transacción de quien llama, con sus bloqueos.
+
+	public Optional<Alojamiento> buscarPorId(Long id) {
+		return alojamientoRepository.findById(id);
+	}
+
+	/** Bloquea la fila hasta terminar la transacción de quien llama. */
+	public Optional<Alojamiento> buscarParaActualizar(Long id) {
+		return alojamientoRepository.buscarParaActualizar(id);
+	}
+
+	/** El bloqueo que usa la reserva para que el alojamiento no cambie mientras se reserva (ADR-002). */
+	public Optional<Alojamiento> buscarParaReservar(Long id) {
+		return alojamientoRepository.buscarParaReservar(id);
+	}
+
+	/** El estado leído con bloqueo compartido: espera un bloqueo o una pausa en curso. */
+	public String estadoConBloqueoCompartido(Long id) {
+		return alojamientoRepository.estadoConBloqueoCompartido(id);
+	}
+
+	public List<Alojamiento> activosDelAnfitrion(Long anfitrionId) {
+		return alojamientoRepository.findByAnfitrionIdAndEstado(anfitrionId, EstadoAlojamiento.ACTIVA);
+	}
+
+	/** Búsqueda con filtros (MA-61). */
+	public Page<Alojamiento> buscarConFiltros(Specification<Alojamiento> filtro, Pageable pagina) {
+		return alojamientoRepository.findAll(filtro, pagina);
+	}
+
 	// ─────────────────────────────────────────
 	// Registrar y editar — MA-53, MA-54
 	// ─────────────────────────────────────────
@@ -85,7 +120,7 @@ public class AlojamientoService {
 	/** Crea el alojamiento en BORRADOR, asociado al anfitrión que lo registra. */
 	@Transactional
 	public AlojamientoDTO crear(Usuario anfitrion, AlojamientoDTO solicitud) {
-		Usuario dueno = usuarioRepository.getReferenceById(anfitrion.getId());
+		Usuario dueno = usuarioService.referencia(anfitrion.getId());
 		Alojamiento alojamiento = alojamientoRepository.save(
 				new Alojamiento(dueno, resolverDatos(solicitud), reloj.instant()));
 		// Solo se registran ids numéricos y enums: no pueden traer saltos de línea.

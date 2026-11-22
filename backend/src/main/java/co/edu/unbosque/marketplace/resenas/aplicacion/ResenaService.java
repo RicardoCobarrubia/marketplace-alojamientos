@@ -9,6 +9,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
+import co.edu.unbosque.marketplace.reservas.aplicacion.GestionReservasService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -16,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
-import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
@@ -27,7 +28,6 @@ import co.edu.unbosque.marketplace.resenas.dominio.Resena;
 import co.edu.unbosque.marketplace.resenas.infraestructura.ResenaRepository;
 import co.edu.unbosque.marketplace.reservas.dominio.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.dominio.Reserva;
-import co.edu.unbosque.marketplace.reservas.infraestructura.ReservaRepository;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 
 /**
@@ -42,19 +42,19 @@ public class ResenaService {
 	private static final String RESENA = "RESENA";
 
 	private final ResenaRepository resenas;
-	private final ReservaRepository reservas;
-	private final AlojamientoRepository alojamientos;
+	private final GestionReservasService gestionReservas;
+	private final AlojamientoService alojamientoService;
 	private final PublicadorEventos publicador;
 	private final Auditoria auditoria;
 	private final Clock reloj;
 	private final ZoneId zonaHoraria;
 
-	public ResenaService(ResenaRepository resenas, ReservaRepository reservas, AlojamientoRepository alojamientos,
-			PublicadorEventos publicador, Auditoria auditoria, Clock reloj,
+	public ResenaService(ResenaRepository resenas, GestionReservasService gestionReservas,
+			AlojamientoService alojamientoService, PublicadorEventos publicador, Auditoria auditoria, Clock reloj,
 			@Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
 		this.resenas = resenas;
-		this.reservas = reservas;
-		this.alojamientos = alojamientos;
+		this.gestionReservas = gestionReservas;
+		this.alojamientoService = alojamientoService;
 		this.publicador = publicador;
 		this.auditoria = auditoria;
 		this.reloj = reloj;
@@ -71,7 +71,7 @@ public class ResenaService {
 	 */
 	@Transactional
 	public ResenaDTO publicar(Usuario usuario, Long reservaId, int calificacion, String comentario) {
-		Reserva reserva = reservas.findById(reservaId)
+		Reserva reserva = gestionReservas.buscarPorId(reservaId)
 				.filter(encontrada -> encontrada.esVisiblePara(usuario))
 				.orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
 		if (!reserva.esDe(usuario.getId())) {
@@ -110,7 +110,7 @@ public class ResenaService {
 	/** Las visibles de un alojamiento publicado, con su promedio. Las ocultas no cuentan. */
 	@Transactional(readOnly = true)
 	public ResenasAlojamientoDTO delAlojamiento(Long alojamientoId) {
-		alojamientos.findById(alojamientoId)
+		alojamientoService.buscarPorId(alojamientoId)
 				.filter(alojamiento -> alojamiento.getEstado() == EstadoAlojamiento.ACTIVA)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 		List<Resena> visibles = resenas.findByAlojamientoIdAndOcultaFalseOrderByCreadaEnDescIdDesc(alojamientoId);
@@ -153,7 +153,7 @@ public class ResenaService {
 	private void moderada(Resena resena, String accion, String evento, String anterior, String motivo) {
 		auditoria.registrar(EventoAuditoria.cambio(accion, RESENA, resena.getId(), anterior, resena.visibilidad(),
 				motivo));
-		Alojamiento alojamiento = alojamientos.findById(resena.getAlojamientoId())
+		Alojamiento alojamiento = alojamientoService.buscarPorId(resena.getAlojamientoId())
 				.orElseThrow(() -> new IllegalStateException("El alojamiento de la reseña no existe."));
 		Map<String, Object> datos = datosDelEvento(resena, alojamiento);
 		if (motivo != null) {

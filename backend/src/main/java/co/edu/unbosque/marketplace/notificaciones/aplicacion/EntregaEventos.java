@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+import co.edu.unbosque.marketplace.usuarios.aplicacion.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,9 +17,6 @@ import co.edu.unbosque.marketplace.notificaciones.dominio.Notificacion;
 import co.edu.unbosque.marketplace.notificaciones.infraestructura.EventoOutboxRepository;
 import co.edu.unbosque.marketplace.notificaciones.infraestructura.NotificacionRepository;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
-import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
-import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
-import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -37,18 +35,18 @@ public class EntregaEventos {
 
 	private final EventoOutboxRepository eventos;
 	private final NotificacionRepository notificaciones;
-	private final UsuarioRepository usuarios;
+	private final UsuarioService usuarioService;
 	private final ReglasNotificacion reglas;
 	private final ObjectMapper json;
 	private final Clock reloj;
 	private final boolean conCorreo;
 
 	public EntregaEventos(EventoOutboxRepository eventos, NotificacionRepository notificaciones,
-			UsuarioRepository usuarios, ReglasNotificacion reglas, ObjectMapper json, Clock reloj,
+			UsuarioService usuarioService, ReglasNotificacion reglas, ObjectMapper json, Clock reloj,
 			@Value("${marketplace.notificaciones.correo.activo}") boolean conCorreo) {
 		this.eventos = eventos;
 		this.notificaciones = notificaciones;
-		this.usuarios = usuarios;
+		this.usuarioService = usuarioService;
 		this.reglas = reglas;
 		this.json = json;
 		this.reloj = reloj;
@@ -90,7 +88,7 @@ public class EntregaEventos {
 	}
 
 	private List<Long> administradores() {
-		return usuarios.findByRolAndEstadoCuenta(Rol.ADMINISTRADOR, EstadoCuenta.ACTIVA).stream()
+		return usuarioService.administradoresActivos().stream()
 				.map(Usuario::getId).toList();
 	}
 }

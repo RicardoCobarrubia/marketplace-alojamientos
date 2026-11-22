@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
@@ -50,7 +51,8 @@ class EmisionCodigosTest {
 
 	@BeforeEach
 	void preparar() {
-		emision = new EmisionCodigos(usuarios, codigos, passwordEncoder, auditoria, Clock.fixed(AHORA, ZoneOffset.UTC));
+		emision = new EmisionCodigos(ServiciosDePrueba.usuarios(usuarios), codigos, passwordEncoder, auditoria,
+				Clock.fixed(AHORA, ZoneOffset.UTC));
 		usuario = TestDatos.usuario(3L, Rol.HUESPED, "hash");
 	}
 

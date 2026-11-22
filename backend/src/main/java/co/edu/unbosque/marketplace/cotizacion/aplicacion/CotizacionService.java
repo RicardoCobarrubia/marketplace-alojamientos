@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +21,6 @@ import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.ServicioAdicional;
-import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.cotizacion.dominio.CalculadoraCotizacion;
@@ -42,18 +42,18 @@ public class CotizacionService {
 
 	private static final Logger log = LoggerFactory.getLogger(CotizacionService.class);
 
-	private final AlojamientoRepository alojamientoRepository;
+	private final AlojamientoService alojamientoService;
 	private final ConfiguracionCotizacionRepository configuracionRepository;
 	private final CalculadoraCotizacion calculadora;
 	private final Auditoria auditoria;
 	private final Clock reloj;
 	private final ZoneId zonaHoraria;
 
-	public CotizacionService(AlojamientoRepository alojamientoRepository,
+	public CotizacionService(AlojamientoService alojamientoService,
 			ConfiguracionCotizacionRepository configuracionRepository, CalculadoraCotizacion calculadora,
 			Auditoria auditoria, Clock reloj,
 			@Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
-		this.alojamientoRepository = alojamientoRepository;
+		this.alojamientoService = alojamientoService;
 		this.configuracionRepository = configuracionRepository;
 		this.calculadora = calculadora;
 		this.auditoria = auditoria;
@@ -73,7 +73,7 @@ public class CotizacionService {
 	public CotizacionDTO cotizar(Usuario actor, Long alojamientoId, LocalDate llegada, LocalDate salida,
 			Set<Long> servicioIds) {
 		RangoFechas rango = validarFechas(llegada, salida);
-		Alojamiento alojamiento = alojamientoRepository.findById(alojamientoId)
+		Alojamiento alojamiento = alojamientoService.buscarPorId(alojamientoId)
 				.filter(encontrado -> puedeVer(actor, encontrado))
 				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 		return CotizacionDTO.desde(alojamientoId, llegada, salida, calcular(alojamiento, rango, servicioIds));

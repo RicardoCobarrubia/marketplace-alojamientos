@@ -5,7 +5,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
+import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
-import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
 import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
@@ -40,20 +41,44 @@ public class DisponibilidadService {
 
 	private static final Logger log = LoggerFactory.getLogger(DisponibilidadService.class);
 
-	private final AlojamientoRepository alojamientoRepository;
+	private final AlojamientoService alojamientoService;
 	private final PeriodoDisponibleRepository periodoRepository;
 	private final PeriodoReservadoRepository reservadoRepository;
 	private final Clock reloj;
 	private final ZoneId zonaHoraria;
 
-	public DisponibilidadService(AlojamientoRepository alojamientoRepository,
+	public DisponibilidadService(AlojamientoService alojamientoService,
 			PeriodoDisponibleRepository periodoRepository, PeriodoReservadoRepository reservadoRepository,
 			Clock reloj, @Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
-		this.alojamientoRepository = alojamientoRepository;
+		this.alojamientoService = alojamientoService;
 		this.periodoRepository = periodoRepository;
 		this.reservadoRepository = reservadoRepository;
 		this.reloj = reloj;
 		this.zonaHoraria = zonaHoraria;
+	}
+
+	// ---- Lo que el módulo de disponibilidad ofrece a los demás módulos (ADR-001) ----
+	// Sin @Transactional propio: se unen a la transacción de quien llama, así la restricción de
+	// no superposición (ADR-003) sigue actuando igual.
+
+	/** Si algún periodo disponible del alojamiento cubre todas las fechas. */
+	public boolean hayPeriodoQueContenga(Long alojamientoId, LocalDate llegada, LocalDate salida) {
+		return periodoRepository.algunoContiene(alojamientoId, llegada, salida);
+	}
+
+	/** Libera las retenciones vencidas que se cruzan con las fechas pedidas. */
+	public int liberarRetencionesVencidas(Long alojamientoId, LocalDate desde, LocalDate hasta, Instant ahora) {
+		return reservadoRepository.liberarRetencionesVencidas(alojamientoId, desde, hasta, ahora);
+	}
+
+	/** Guarda las fechas reservadas y las envía ya a la base de datos, para que actúe ADR-003. */
+	public PeriodoReservado guardarReservado(PeriodoReservado periodo) {
+		return reservadoRepository.saveAndFlush(periodo);
+	}
+
+	/** El periodo de la reserva con bloqueo de escritura. */
+	public Optional<PeriodoReservado> bloquearPorReserva(Long reservaId) {
+		return reservadoRepository.bloquearPorReserva(reservaId);
 	}
 
 	// ─────────────────────────────────────────
@@ -189,13 +214,13 @@ public class DisponibilidadService {
 	}
 
 	private Alojamiento buscarAlojamiento(Long alojamientoId) {
-		return alojamientoRepository.findById(alojamientoId)
+		return alojamientoService.buscarPorId(alojamientoId)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 	}
 
 	/** Para modificar la disponibilidad: bloquea el alojamiento (ver buscarParaActualizar). */
 	private Alojamiento buscarDelDueno(Usuario anfitrion, Long alojamientoId) {
-		Alojamiento alojamiento = alojamientoRepository.buscarParaActualizar(alojamientoId)
+		Alojamiento alojamiento = alojamientoService.buscarParaActualizar(alojamientoId)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 		if (!alojamiento.esDe(anfitrion.getId())) {
 			throw new AccesoDenegadoException("Solo el anfitrión dueño puede gestionar la disponibilidad.");

@@ -2,6 +2,7 @@ package co.edu.unbosque.marketplace.notificaciones.aplicacion;
 
 import java.time.Clock;
 
+import co.edu.unbosque.marketplace.usuarios.aplicacion.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -12,7 +13,6 @@ import co.edu.unbosque.marketplace.notificaciones.dominio.EnvioCorreo;
 import co.edu.unbosque.marketplace.notificaciones.dominio.Notificacion;
 import co.edu.unbosque.marketplace.notificaciones.infraestructura.NotificacionRepository;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
-import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 
 /**
  * Envía por correo la copia de una notificación (MA-75). Va aparte de la entrega del evento: un
@@ -26,14 +26,14 @@ public class EnvioCorreos {
 	static final int INTENTOS_MAXIMOS = 5;
 
 	private final NotificacionRepository notificaciones;
-	private final UsuarioRepository usuarios;
+	private final UsuarioService usuarioService;
 	private final EnvioCorreo correo;
 	private final Clock reloj;
 
-	public EnvioCorreos(NotificacionRepository notificaciones, UsuarioRepository usuarios, EnvioCorreo correo,
+	public EnvioCorreos(NotificacionRepository notificaciones, UsuarioService usuarioService, EnvioCorreo correo,
 			Clock reloj) {
 		this.notificaciones = notificaciones;
-		this.usuarios = usuarios;
+		this.usuarioService = usuarioService;
 		this.correo = correo;
 		this.reloj = reloj;
 	}
@@ -49,7 +49,7 @@ public class EnvioCorreos {
 		if (notificacion == null) {
 			return false;
 		}
-		Usuario usuario = usuarios.findById(notificacion.getUsuarioId())
+		Usuario usuario = usuarioService.buscarPorId(notificacion.getUsuarioId())
 				.orElseThrow(() -> new IllegalStateException("El usuario de la notificación ya no existe."));
 		correo.enviar(usuario.getEmail(), "Inversiones LR: " + notificacion.getTitulo(), cuerpo(usuario, notificacion));
 		notificacion.correoEnviado(reloj.instant());

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.TestDatos;
@@ -72,7 +73,8 @@ class AlojamientoServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new AlojamientoService(alojamientoRepository, servicioAdicionalRepository, usuarioRepository,
+		servicio = new AlojamientoService(alojamientoRepository, servicioAdicionalRepository,
+				ServiciosDePrueba.usuarios(usuarioRepository),
 				ciudadRepository, tipoRepository, servicioRepository, politicaRepository,
 				mock(PublicadorEventos.class), auditoria, Clock.fixed(AHORA, ZoneOffset.UTC));
 		alojamiento = TestDatos.alojamiento(10L, dueno);

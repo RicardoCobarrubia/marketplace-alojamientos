@@ -6,10 +6,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import co.edu.unbosque.marketplace.disponibilidad.aplicacion.DisponibilidadService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
-import co.edu.unbosque.marketplace.disponibilidad.infraestructura.PeriodoReservadoRepository;
 import co.edu.unbosque.marketplace.reservas.dominio.CalculadoraDevolucion;
 import co.edu.unbosque.marketplace.reservas.dominio.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.dominio.Reserva;
@@ -42,7 +44,7 @@ public class GestionReservasService {
 	private static final Sort MAS_RECIENTES = Sort.by(Sort.Direction.DESC, "creadoEn", "id");
 
 	private final ReservaRepository reservaRepository;
-	private final PeriodoReservadoRepository periodoReservadoRepository;
+	private final DisponibilidadService disponibilidadService;
 	private final EventosReserva eventos;
 	private final CalculadoraDevolucion calculadora;
 	private final ObjectMapper json;
@@ -50,16 +52,27 @@ public class GestionReservasService {
 	private final ZoneId zonaHoraria;
 
 	public GestionReservasService(ReservaRepository reservaRepository,
-			PeriodoReservadoRepository periodoReservadoRepository, EventosReserva eventos,
+			DisponibilidadService disponibilidadService, EventosReserva eventos,
 			CalculadoraDevolucion calculadora, ObjectMapper json, Clock reloj,
 			@Value("${marketplace.zona-horaria}") ZoneId zonaHoraria) {
 		this.reservaRepository = reservaRepository;
-		this.periodoReservadoRepository = periodoReservadoRepository;
+		this.disponibilidadService = disponibilidadService;
 		this.eventos = eventos;
 		this.calculadora = calculadora;
 		this.json = json;
 		this.reloj = reloj;
 		this.zonaHoraria = zonaHoraria;
+	}
+
+	// ---- Lo que el módulo de reservas ofrece a los demás módulos (ADR-001) ----
+
+	public Optional<Reserva> buscarPorId(Long id) {
+		return reservaRepository.findById(id);
+	}
+
+	/** Reservas del usuario en esos estados que aún no terminan (MA-52). */
+	public long contarSinTerminarDelUsuario(Long usuarioId, Collection<EstadoReserva> estados, LocalDate hoy) {
+		return reservaRepository.contarSinTerminarDelUsuario(usuarioId, estados, hoy);
 	}
 
 	// ─────────────────────────────────────────
@@ -105,7 +118,7 @@ public class GestionReservasService {
 		Instant ahora = reloj.instant();
 		EstadoReserva anterior = reserva.getEstado();
 		reserva.cancelar(usuario.getId(), motivo, devolucion(reserva, ahora, porAdministrador), hoy(), ahora);
-		periodoReservadoRepository.bloquearPorReserva(reservaId)
+		disponibilidadService.bloquearPorReserva(reservaId)
 				.filter(fechas -> fechas.getLiberadoEn() == null)
 				.ifPresent(fechas -> fechas.liberar(ahora));
 		Map<String, Object> datos = new LinkedHashMap<>();
