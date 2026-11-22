@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { CircleAlert, LoaderCircle, TriangleAlert } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { LoaderCircle, TriangleAlert } from 'lucide-react';
 import { ApiError } from '../../api/ApiError';
 import { cotizar } from '../../api/cotizacion';
 import { consultarDisponibilidad } from '../../api/disponibilidad';
@@ -13,6 +13,7 @@ import type { Alojamiento, MotivoNoDisponible, PeriodoDisponible } from '../../t
 import { NOMBRE_MODALIDAD } from '../../types/alojamiento';
 import type { Cotizacion, DatosReserva } from '../../types/reserva';
 import { formatearPrecio, hoyIso } from '../../utils/formato';
+import { VentanaPago } from './VentanaPago';
 
 const MOTIVO_NO_DISPONIBLE: Record<MotivoNoDisponible, string> = {
   NO_ACTIVO: 'El alojamiento no está recibiendo reservas en este momento.',
@@ -26,12 +27,6 @@ type Consulta =
   | { tipo: 'no-disponible'; mensaje: string }
   | { tipo: 'error'; mensaje: string }
   | { tipo: 'cotizada'; cotizacion: Cotizacion };
-
-/** Error al reservar; si el backend alcanzó a registrar la reserva, trae su número. */
-interface ErrorReserva {
-  mensaje: string;
-  reservaId: number | null;
-}
 
 interface PropiedadesTarjetaReserva {
   alojamiento: Alojamiento;
@@ -52,8 +47,8 @@ export function TarjetaReserva({ alojamiento: a, periodos, inicial = {} }: Propi
   const [huespedes, setHuespedes] = useState(String(inicial.huespedes ?? 1));
   const [servicioIds, setServicioIds] = useState<number[]>([]);
   const [consulta, setConsulta] = useState<Consulta>({ tipo: 'vacia' });
-  const [reservando, setReservando] = useState(false);
-  const [errorReserva, setErrorReserva] = useState<ErrorReserva | null>(null);
+  // Mientras la ventana de pago está abierta no se cambian las fechas ni los servicios
+  const [pagoAbierto, setPagoAbierto] = useState(false);
   const [revisarDeNuevo, setRevisarDeNuevo] = useState(0);
 
   const numeroHuespedes = Number(huespedes);
@@ -113,22 +108,20 @@ export function TarjetaReserva({ alojamiento: a, periodos, inicial = {} }: Propi
     setServicioIds((actuales) => (actuales.includes(id) ? actuales.filter((s) => s !== id) : [...actuales, id]));
   }
 
-  async function reservar() {
+  /** Lo llama la ventana de pago después de validar la tarjeta. Si falla, lanza el error para que la ventana lo muestre. */
+  async function pagar(medioPago: string) {
     if (!datos || consulta.tipo !== 'cotizada') return;
-    setReservando(true);
-    setErrorReserva(null);
     try {
       const respuesta = await crearReserva(datos, claveDelIntento());
       const reservaId = estaEnProceso(respuesta) ? respuesta.reservaId : respuesta.id;
-      navegar(rutaReservaHuesped(reservaId), { state: { recienReservada: true } });
+      navegar(rutaReservaHuesped(reservaId), { state: { recienReservada: true, medioPago } });
     } catch (e) {
-      const reservaId = e instanceof ApiError ? e.reservaId : null;
       if (e instanceof ApiError && e.codigo === 'FECHAS_NO_DISPONIBLES') {
-        // Otra persona tomó las fechas: se vuelve a consultar para mostrar el motivo
+        // Otra persona tomó las fechas: se cierra el pago y se vuelve a consultar para mostrar el motivo
+        setPagoAbierto(false);
         setRevisarDeNuevo((n) => n + 1);
       }
-      setErrorReserva({ mensaje: mensajeParaUsuario(e), reservaId });
-      setReservando(false);
+      throw e;
     }
   }
 
@@ -151,7 +144,7 @@ export function TarjetaReserva({ alojamiento: a, periodos, inicial = {} }: Propi
             setLlegada(e.target.value);
             if (salida && e.target.value >= salida) setSalida('');
           }}
-          disabled={reservando}
+          disabled={pagoAbierto}
         />
         <CampoTexto
           etiqueta="Salida"
@@ -159,7 +152,7 @@ export function TarjetaReserva({ alojamiento: a, periodos, inicial = {} }: Propi
           min={llegada || primerDia}
           value={salida}
           onChange={(e) => setSalida(e.target.value)}
-          disabled={reservando}
+          disabled={pagoAbierto}
         />
       </div>
       {errorFechas && <p className="campo__error tarjeta-reserva__error-fechas">{errorFechas}</p>}
@@ -174,11 +167,11 @@ export function TarjetaReserva({ alojamiento: a, periodos, inicial = {} }: Propi
         onChange={(e) => setHuespedes(e.target.value)}
         error={huespedesValidos ? undefined : `Debe ser un número de 1 a ${a.capacidad}.`}
         ayuda={`Máximo ${a.capacidad}`}
-        disabled={reservando}
+        disabled={pagoAbierto}
       />
 
       {a.serviciosAdicionales.length > 0 && (
-        <fieldset className="tarjeta-reserva__servicios" disabled={reservando}>
+        <fieldset className="tarjeta-reserva__servicios" disabled={pagoAbierto}>
           <legend className="campo__etiqueta">Servicios adicionales</legend>
           {a.serviciosAdicionales.map((s) => (
             <label key={s.id} className="opcion-servicio">
@@ -210,35 +203,33 @@ export function TarjetaReserva({ alojamiento: a, periodos, inicial = {} }: Propi
       )}
       {consulta.tipo === 'cotizada' && <DesgloseReserva reserva={consulta.cotizacion} etiquetaTotal="Total" />}
 
-      {errorReserva && (
-        <div className="alerta alerta--error" role="alert">
-          <CircleAlert size={16} aria-hidden="true" />
-          <span>
-            {errorReserva.mensaje}
-            {errorReserva.reservaId && (
-              <>
-                {' '}
-                <Link to={rutaReservaHuesped(errorReserva.reservaId)} className="enlace">
-                  Ver la reserva #{errorReserva.reservaId}
-                </Link>
-              </>
-            )}
-          </span>
-        </div>
-      )}
-
       <button
         type="button"
         className="boton boton--primario boton--bloque"
-        onClick={reservar}
-        disabled={consulta.tipo !== 'cotizada' || !datos || reservando}
+        onClick={() => setPagoAbierto(true)}
+        disabled={consulta.tipo !== 'cotizada' || !datos}
       >
-        {reservando && <LoaderCircle size={16} className="girando" aria-hidden="true" />}
-        {reservando ? 'Procesando el pago…' : 'Reservar y pagar'}
+        Reservar y pagar
       </button>
       <p className="campo__ayuda tarjeta-reserva__nota">
-        Al confirmar se cobra el total. La reserva queda confirmada en cuanto se apruebe el pago.
+        En el siguiente paso pagas con tarjeta. La reserva queda confirmada en cuanto se aprueba el pago.
       </p>
+
+      {consulta.tipo === 'cotizada' && datos && (
+        <VentanaPago
+          abierta={pagoAbierto}
+          resumen={{
+            titulo: a.titulo,
+            llegada: datos.llegada,
+            salida: datos.salida,
+            noches: consulta.cotizacion.noches,
+            huespedes: datos.huespedes,
+            total: consulta.cotizacion.total,
+          }}
+          alPagar={pagar}
+          alCerrar={() => setPagoAbierto(false)}
+        />
+      )}
     </aside>
   );
 }
