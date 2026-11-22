@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
+import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -13,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoDTO;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
-import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
 import co.edu.unbosque.marketplace.busqueda.infraestructura.FiltrosBusqueda;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
 import co.edu.unbosque.marketplace.cotizacion.aplicacion.CotizacionService;
@@ -34,12 +34,12 @@ public class BusquedaService {
 	/** Del más barato al más caro; a igual precio, el más antiguo primero para que el orden sea estable. */
 	private static final Sort ORDEN = Sort.by("precioNoche").ascending().and(Sort.by("id").ascending());
 
-	private final AlojamientoRepository alojamientos;
+	private final AlojamientoService alojamientoService;
 	private final CotizacionService cotizacion;
 	private final Clock reloj;
 
-	public BusquedaService(AlojamientoRepository alojamientos, CotizacionService cotizacion, Clock reloj) {
-		this.alojamientos = alojamientos;
+	public BusquedaService(AlojamientoService alojamientoService, CotizacionService cotizacion, Clock reloj) {
+		this.alojamientoService = alojamientoService;
 		this.cotizacion = cotizacion;
 		this.reloj = reloj;
 	}
@@ -49,7 +49,8 @@ public class BusquedaService {
 		Specification<Alojamiento> filtro = Specification.allOf(filtros(criterios));
 		int pagina = criterios.pagina() == null ? 0 : criterios.pagina();
 		int tamano = criterios.tamano() == null ? TAMANO_POR_DEFECTO : criterios.tamano();
-		Page<Alojamiento> encontrados = alojamientos.findAll(filtro, PageRequest.of(pagina, tamano, ORDEN));
+		Page<Alojamiento> encontrados = alojamientoService.buscarConFiltros(filtro,
+				PageRequest.of(pagina, tamano, ORDEN));
 		return new ResultadoBusquedaDTO(encontrados.map(AlojamientoDTO::desde).getContent(), pagina, tamano,
 				encontrados.getTotalElements(), encontrados.getTotalPages(),
 				encontrados.getTotalElements() == 0 ? SIN_RESULTADOS : null);

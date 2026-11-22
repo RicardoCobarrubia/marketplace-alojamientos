@@ -9,6 +9,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
+import co.edu.unbosque.marketplace.disponibilidad.aplicacion.DisponibilidadService;
+import co.edu.unbosque.marketplace.usuarios.aplicacion.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -19,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
-import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
 import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
 import co.edu.unbosque.marketplace.comun.excepcion.RecursoNoEncontradoException;
 import co.edu.unbosque.marketplace.comun.excepcion.ReglaNegocioException;
@@ -29,15 +31,12 @@ import co.edu.unbosque.marketplace.cotizacion.aplicacion.CotizacionService;
 import co.edu.unbosque.marketplace.cotizacion.dominio.Cotizacion;
 import co.edu.unbosque.marketplace.disponibilidad.dominio.PeriodoReservado;
 import co.edu.unbosque.marketplace.disponibilidad.dominio.RangoFechas;
-import co.edu.unbosque.marketplace.disponibilidad.infraestructura.PeriodoDisponibleRepository;
-import co.edu.unbosque.marketplace.disponibilidad.infraestructura.PeriodoReservadoRepository;
 import co.edu.unbosque.marketplace.reservas.dominio.ClaveIdempotencia;
 import co.edu.unbosque.marketplace.reservas.dominio.EstadoReserva;
 import co.edu.unbosque.marketplace.reservas.dominio.Reserva;
 import co.edu.unbosque.marketplace.reservas.infraestructura.ClaveIdempotenciaRepository;
 import co.edu.unbosque.marketplace.reservas.infraestructura.ReservaRepository;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
-import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -61,10 +60,9 @@ public class ReservaTransacciones {
 
 	private final ReservaRepository reservaRepository;
 	private final ClaveIdempotenciaRepository claveRepository;
-	private final AlojamientoRepository alojamientoRepository;
-	private final UsuarioRepository usuarioRepository;
-	private final PeriodoDisponibleRepository periodoDisponibleRepository;
-	private final PeriodoReservadoRepository periodoReservadoRepository;
+	private final AlojamientoService alojamientoService;
+	private final UsuarioService usuarioService;
+	private final DisponibilidadService disponibilidadService;
 	private final CotizacionService cotizacionService;
 	private final EventosReserva eventos;
 	private final RevisionReservasService revisionReservas;
@@ -73,17 +71,15 @@ public class ReservaTransacciones {
 	private final Duration retencion;
 
 	public ReservaTransacciones(ReservaRepository reservaRepository, ClaveIdempotenciaRepository claveRepository,
-			AlojamientoRepository alojamientoRepository, UsuarioRepository usuarioRepository,
-			PeriodoDisponibleRepository periodoDisponibleRepository,
-			PeriodoReservadoRepository periodoReservadoRepository, CotizacionService cotizacionService,
+			AlojamientoService alojamientoService, UsuarioService usuarioService,
+			DisponibilidadService disponibilidadService, CotizacionService cotizacionService,
 			EventosReserva eventos, RevisionReservasService revisionReservas, ObjectMapper json, Clock reloj,
 			@Value("${marketplace.reservas.retencion:PT10M}") Duration retencion) {
 		this.reservaRepository = reservaRepository;
 		this.claveRepository = claveRepository;
-		this.alojamientoRepository = alojamientoRepository;
-		this.usuarioRepository = usuarioRepository;
-		this.periodoDisponibleRepository = periodoDisponibleRepository;
-		this.periodoReservadoRepository = periodoReservadoRepository;
+		this.alojamientoService = alojamientoService;
+		this.usuarioService = usuarioService;
+		this.disponibilidadService = disponibilidadService;
 		this.cotizacionService = cotizacionService;
 		this.eventos = eventos;
 		this.revisionReservas = revisionReservas;
@@ -116,16 +112,16 @@ public class ReservaTransacciones {
 		verificarCuentaActiva(huesped);
 
 		RangoFechas rango = cotizacionService.validarFechas(solicitud.llegada(), solicitud.salida());
-		Alojamiento alojamiento = alojamientoRepository.buscarParaReservar(solicitud.alojamientoId())
+		Alojamiento alojamiento = alojamientoService.buscarParaReservar(solicitud.alojamientoId())
 				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 		validar(alojamiento, rango, solicitud.huespedes());
 		Cotizacion cotizacion = cotizacionService.calcular(alojamiento, rango, solicitud.servicioIds());
 
-		Reserva reserva = reservaRepository.save(new Reserva(usuarioRepository.getReferenceById(huesped.getId()),
+		Reserva reserva = reservaRepository.save(new Reserva(usuarioService.referencia(huesped.getId()),
 				alojamiento, rango, solicitud.huespedes(), cotizacion, MDC.get(CorrelacionFilter.CLAVE_MDC), ahora));
-		periodoReservadoRepository.liberarRetencionesVencidas(alojamiento.getId(), rango.llegada(), rango.salida(),
+		disponibilidadService.liberarRetencionesVencidas(alojamiento.getId(), rango.llegada(), rango.salida(),
 				ahora);
-		periodoReservadoRepository.saveAndFlush(
+		disponibilidadService.guardarReservado(
 				new PeriodoReservado(alojamiento, reserva.getId(), rango, ahora.plus(retencion), ahora));
 		registro.asociar(reserva.getId());
 		return reserva;
@@ -139,7 +135,7 @@ public class ReservaTransacciones {
 	 * orden de la desactivación y de la restricción.
 	 */
 	private void verificarCuentaActiva(Usuario huesped) {
-		List<String> estados = usuarioRepository.estadosConBloqueoCompartido(List.of(huesped.getId()));
+		List<String> estados = usuarioService.estadosConBloqueoCompartido(List.of(huesped.getId()));
 		if (!estados.contains(Usuario.EstadoCuenta.ACTIVA.name())) {
 			throw new AccesoDenegadoException("Tu cuenta no está activa.");
 		}
@@ -154,7 +150,7 @@ public class ReservaTransacciones {
 			throw new SolicitudInvalidaException("HUESPEDES_INVALIDOS",
 					"El alojamiento admite máximo " + alojamiento.getCapacidad() + " huéspedes.");
 		}
-		if (!periodoDisponibleRepository.algunoContiene(alojamiento.getId(), rango.llegada(), rango.salida())) {
+		if (!disponibilidadService.hayPeriodoQueContenga(alojamiento.getId(), rango.llegada(), rango.salida())) {
 			throw new ReglaNegocioException("FUERA_DE_PERIODO",
 					"El anfitrión no tiene disponibles esas fechas.");
 		}
@@ -358,10 +354,10 @@ public class ReservaTransacciones {
 	 */
 	private boolean enModeracion(Reserva reserva) {
 		Alojamiento alojamiento = reserva.getAlojamiento();
-		boolean restringido = usuarioRepository.estadosConBloqueoCompartido(
+		boolean restringido = usuarioService.estadosConBloqueoCompartido(
 				List.of(reserva.getHuesped().getId(), alojamiento.getAnfitrion().getId()))
 				.contains(Usuario.EstadoCuenta.RESTRINGIDA.name());
-		String estadoAlojamiento = alojamientoRepository.estadoConBloqueoCompartido(alojamiento.getId());
+		String estadoAlojamiento = alojamientoService.estadoConBloqueoCompartido(alojamiento.getId());
 		return restringido || EstadoAlojamiento.BLOQUEADA.name().equals(estadoAlojamiento);
 	}
 
@@ -371,7 +367,7 @@ public class ReservaTransacciones {
 	}
 
 	private PeriodoReservado fechasDe(Long reservaId) {
-		return periodoReservadoRepository.bloquearPorReserva(reservaId)
+		return disponibilidadService.bloquearPorReserva(reservaId)
 				.orElseThrow(() -> new IllegalStateException("La reserva " + reservaId + " no tiene fechas retenidas."));
 	}
 

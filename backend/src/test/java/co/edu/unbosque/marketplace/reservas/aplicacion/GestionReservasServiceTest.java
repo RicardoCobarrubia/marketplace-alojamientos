@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.comun.excepcion.AccesoDenegadoException;
@@ -69,7 +70,8 @@ class GestionReservasServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new GestionReservasService(reservaRepository, periodoReservadoRepository, eventos,
+		servicio = new GestionReservasService(reservaRepository,
+				ServiciosDePrueba.disponibilidad(periodoReservadoRepository), eventos,
 				new CalculadoraDevolucion(List.of(new DevolucionFlexible())), JsonMapper.builder().build(),
 				Clock.fixed(AHORA, ZoneOffset.UTC), ZoneId.of("America/Bogota"));
 		anfitrion = TestDatos.usuario(1L, Rol.ANFITRION, "hash");

@@ -4,10 +4,16 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import com.tngtech.archunit.core.domain.Dependency;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.library.dependencies.Slice;
 
 /**
  * Comprueba que el código respeta el estilo elegido en el ADR-001: monolito modular en capas,
@@ -39,6 +45,34 @@ class ArquitecturaTest {
 	static final ArchRule modulosSinCiclos = slices()
 			.matching("co.edu.unbosque.marketplace.(*)..")
 			.should().beFreeOfCycles();
+
+	/**
+	 * Cada módulo es dueño de su infraestructura: ningún módulo usa los repositorios ni los
+	 * adaptadores de otro. Para pedirle datos a otro módulo se usa su servicio de aplicación
+	 * (por ejemplo {@code UsuarioService} o {@code DisponibilidadService}).
+	 */
+	@ArchTest
+	static final ArchRule infraestructuraPropia = slices()
+			.matching("co.edu.unbosque.marketplace.(*)..")
+			.should(new ArchCondition<Slice>("no usar la infraestructura de otro módulo") {
+				@Override
+				public void check(Slice modulo, ConditionEvents eventos) {
+					String nombre = modulo.getNamePart(1);
+					for (JavaClass clase : modulo) {
+						for (Dependency dependencia : clase.getDirectDependenciesFromSelf()) {
+							String paquete = dependencia.getTargetClass().getPackageName();
+							String prefijo = "co.edu.unbosque.marketplace.";
+							if (!paquete.startsWith(prefijo) || !paquete.contains(".infraestructura")) {
+								continue;
+							}
+							String destino = paquete.substring(prefijo.length()).split("\\.")[0];
+							if (!destino.equals(nombre)) {
+								eventos.add(SimpleConditionEvent.violated(dependencia, dependencia.getDescription()));
+							}
+						}
+					}
+				}
+			});
 
 	/** El código común no depende de ningún módulo de negocio. */
 	@ArchTest

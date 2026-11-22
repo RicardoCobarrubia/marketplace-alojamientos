@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.notificaciones.dominio.CorreoNoEnviadoException;
 import co.edu.unbosque.marketplace.notificaciones.dominio.EnvioCorreo;
@@ -45,7 +46,8 @@ class EnvioCorreosTest {
 
 	@BeforeEach
 	void preparar() {
-		envio = new EnvioCorreos(notificaciones, usuarios, correo, Clock.fixed(AHORA, ZoneOffset.UTC));
+		envio = new EnvioCorreos(notificaciones, ServiciosDePrueba.usuarios(usuarios), correo,
+				Clock.fixed(AHORA, ZoneOffset.UTC));
 		notificacion = new Notificacion(2L, 7L, "RESERVA_CONFIRMADA", "Reserva confirmada", "Tu reserva #50 quedó confirmada.",
 				true, AHORA);
 	}

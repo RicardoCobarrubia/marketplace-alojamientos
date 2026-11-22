@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
+import co.edu.unbosque.marketplace.usuarios.aplicacion.UsuarioService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +18,6 @@ import co.edu.unbosque.marketplace.perfiles.dominio.CodigoRecuperacion;
 import co.edu.unbosque.marketplace.perfiles.infraestructura.CodigoRecuperacionRepository;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
-import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 
 /**
  * Crea el código de recuperación de un usuario (MA-50, escenario 1). Corre fuera de la petición
@@ -44,16 +44,16 @@ public class EmisionCodigos {
 		}
 	}
 
-	private final UsuarioRepository usuarios;
+	private final UsuarioService usuarioService;
 	private final CodigoRecuperacionRepository codigos;
 	private final PasswordEncoder passwordEncoder;
 	private final Auditoria auditoria;
 	private final Clock reloj;
 	private final SecureRandom aleatorio = new SecureRandom();
 
-	public EmisionCodigos(UsuarioRepository usuarios, CodigoRecuperacionRepository codigos,
+	public EmisionCodigos(UsuarioService usuarioService, CodigoRecuperacionRepository codigos,
 			PasswordEncoder passwordEncoder, Auditoria auditoria, Clock reloj) {
-		this.usuarios = usuarios;
+		this.usuarioService = usuarioService;
 		this.codigos = codigos;
 		this.passwordEncoder = passwordEncoder;
 		this.auditoria = auditoria;
@@ -66,8 +66,8 @@ public class EmisionCodigos {
 	 */
 	@Transactional
 	public Optional<CodigoEmitido> emitir(String email) {
-		Optional<Usuario> registrado = usuarios.findByEmail(Usuario.normalizarEmail(email))
-				.flatMap(usuario -> usuarios.buscarParaActualizar(usuario.getId()))
+		Optional<Usuario> registrado = usuarioService.buscarPorEmail(email)
+				.flatMap(usuario -> usuarioService.buscarParaActualizar(usuario.getId()))
 				.filter(usuario -> usuario.getEstadoCuenta() != EstadoCuenta.RESTRINGIDA);
 		if (registrado.isEmpty()) {
 			return Optional.empty();

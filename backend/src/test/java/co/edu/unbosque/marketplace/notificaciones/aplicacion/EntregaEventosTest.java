@@ -20,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.notificaciones.dominio.EventoOutbox;
 import co.edu.unbosque.marketplace.notificaciones.dominio.EventoOutbox.EstadoEvento;
@@ -45,7 +46,8 @@ class EntregaEventosTest {
 
 	@BeforeEach
 	void preparar() {
-		entrega = new EntregaEventos(eventos, notificaciones, usuarios, new ReglasNotificacion(),
+		entrega = new EntregaEventos(eventos, notificaciones, ServiciosDePrueba.usuarios(usuarios),
+				new ReglasNotificacion(),
 				JsonMapper.builder().build(), Clock.fixed(AHORA, ZoneOffset.UTC), true);
 	}
 

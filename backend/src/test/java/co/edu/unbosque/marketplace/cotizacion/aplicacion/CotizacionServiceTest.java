@@ -22,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
@@ -59,7 +60,7 @@ class CotizacionServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new CotizacionService(alojamientoRepository, configuracionRepository,
+		servicio = new CotizacionService(ServiciosDePrueba.alojamientos(alojamientoRepository), configuracionRepository,
 				new CalculadoraCotizacion(List.of(new DescuentoEstadiaLarga())), auditoria, Clock.fixed(AHORA, ZoneOffset.UTC),
 				BOGOTA);
 		dueno = TestDatos.usuario(1L, Rol.ANFITRION, "hash");

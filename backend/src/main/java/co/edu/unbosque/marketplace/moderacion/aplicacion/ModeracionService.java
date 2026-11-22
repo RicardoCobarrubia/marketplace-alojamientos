@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+import co.edu.unbosque.marketplace.usuarios.aplicacion.UsuarioService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
@@ -16,7 +17,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
-import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.comun.auditoria.EventoAuditoria;
 import co.edu.unbosque.marketplace.comun.configuracion.CacheConfig;
@@ -27,7 +27,6 @@ import co.edu.unbosque.marketplace.reservas.aplicacion.RevisionReservasService;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
 import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
-import co.edu.unbosque.marketplace.usuarios.infraestructura.UsuarioRepository;
 
 /**
  * Acciones de moderación del administrador (MA-80, MA-81). Cada una ocurre en una sola
@@ -42,19 +41,19 @@ public class ModeracionService {
 	private static final String ALOJAMIENTO = "ALOJAMIENTO";
 	private static final String USUARIO = "USUARIO";
 
-	private final AlojamientoRepository alojamientoRepository;
-	private final UsuarioRepository usuarioRepository;
+	private final AlojamientoService alojamientoService;
+	private final UsuarioService usuarioService;
 	private final RevisionReservasService revisionReservas;
 	private final Auditoria auditoria;
 	private final CacheManager cacheManager;
 	private final PublicadorEventos publicador;
 	private final Clock reloj;
 
-	public ModeracionService(AlojamientoRepository alojamientoRepository, UsuarioRepository usuarioRepository,
+	public ModeracionService(AlojamientoService alojamientoService, UsuarioService usuarioService,
 			RevisionReservasService revisionReservas, Auditoria auditoria, CacheManager cacheManager,
 			PublicadorEventos publicador, Clock reloj) {
-		this.alojamientoRepository = alojamientoRepository;
-		this.usuarioRepository = usuarioRepository;
+		this.alojamientoService = alojamientoService;
+		this.usuarioService = usuarioService;
 		this.revisionReservas = revisionReservas;
 		this.auditoria = auditoria;
 		this.cacheManager = cacheManager;
@@ -141,8 +140,7 @@ public class ModeracionService {
 
 	private int pausarAlojamientos(Long anfitrionId) {
 		Instant ahora = reloj.instant();
-		List<Alojamiento> activos = alojamientoRepository.findByAnfitrionIdAndEstado(anfitrionId,
-				EstadoAlojamiento.ACTIVA);
+		List<Alojamiento> activos = alojamientoService.activosDelAnfitrion(anfitrionId);
 		for (Alojamiento alojamiento : activos) {
 			alojamiento.cambiarEstado(EstadoAlojamiento.PAUSADA, ahora);
 			auditoria.registrar(EventoAuditoria.cambio("PAUSAR_ALOJAMIENTO", ALOJAMIENTO, alojamiento.getId(),
@@ -168,12 +166,12 @@ public class ModeracionService {
 	}
 
 	private Alojamiento alojamiento(Long alojamientoId) {
-		return alojamientoRepository.buscarParaActualizar(alojamientoId)
+		return alojamientoService.buscarParaActualizar(alojamientoId)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El alojamiento no existe."));
 	}
 
 	private Usuario usuario(Long usuarioId) {
-		return usuarioRepository.buscarParaActualizar(usuarioId)
+		return usuarioService.buscarParaActualizar(usuarioId)
 				.orElseThrow(() -> new RecursoNoEncontradoException("El usuario no existe."));
 	}
 }

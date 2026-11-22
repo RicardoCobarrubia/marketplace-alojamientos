@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.aplicacion.AlojamientoService;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
@@ -62,7 +63,8 @@ class DesactivacionCuentaServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new DesactivacionCuentaService(usuarioRepository, reservaRepository, alojamientoService, sesiones,
+		servicio = new DesactivacionCuentaService(ServiciosDePrueba.usuarios(usuarioRepository),
+				ServiciosDePrueba.reservas(reservaRepository), alojamientoService, sesiones,
 				auditoria, Clock.fixed(AHORA, ZoneOffset.UTC), BOGOTA);
 		anfitrion = TestDatos.usuario(1L, Rol.ANFITRION, "hash", "anfitrion@correo.com");
 	}

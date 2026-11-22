@@ -24,6 +24,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
@@ -64,7 +65,8 @@ class ModeracionServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new ModeracionService(alojamientoRepository, usuarioRepository, revisionReservas, auditoria,
+		servicio = new ModeracionService(ServiciosDePrueba.alojamientos(alojamientoRepository),
+				ServiciosDePrueba.usuarios(usuarioRepository), revisionReservas, auditoria,
 				cacheManager, publicador, Clock.fixed(AHORA, ZoneOffset.UTC));
 		anfitrion = TestDatos.usuario(1L, Rol.ANFITRION, "hash", "anfitrion@correo.com");
 		alojamiento = TestDatos.alojamiento(10L, anfitrion);

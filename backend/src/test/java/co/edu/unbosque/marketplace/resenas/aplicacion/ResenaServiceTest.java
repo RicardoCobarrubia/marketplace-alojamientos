@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento.EstadoAlojamiento;
@@ -73,7 +74,8 @@ class ResenaServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new ResenaService(resenas, reservas, alojamientos, publicador, auditoria,
+		servicio = new ResenaService(resenas, ServiciosDePrueba.reservas(reservas),
+				ServiciosDePrueba.alojamientos(alojamientos), publicador, auditoria,
 				Clock.fixed(AHORA, ZoneOffset.UTC), ZoneId.of("America/Bogota"));
 		anfitrion = TestDatos.usuario(1L, Rol.ANFITRION, "hash");
 		huesped = TestDatos.usuario(2L, Rol.HUESPED, "hash", "huesped@correo.com");

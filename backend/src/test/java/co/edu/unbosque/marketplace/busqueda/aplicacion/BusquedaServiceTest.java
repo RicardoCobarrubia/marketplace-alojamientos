@@ -28,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.alojamientos.dominio.Alojamiento;
 import co.edu.unbosque.marketplace.alojamientos.infraestructura.AlojamientoRepository;
@@ -51,7 +52,8 @@ class BusquedaServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new BusquedaService(alojamientos, cotizacion, Clock.fixed(AHORA, ZoneOffset.UTC));
+		servicio = new BusquedaService(ServiciosDePrueba.alojamientos(alojamientos), cotizacion,
+				Clock.fixed(AHORA, ZoneOffset.UTC));
 	}
 
 	private static CriteriosBusquedaDTO criterios(LocalDate llegada, LocalDate salida, BigDecimal minimo,

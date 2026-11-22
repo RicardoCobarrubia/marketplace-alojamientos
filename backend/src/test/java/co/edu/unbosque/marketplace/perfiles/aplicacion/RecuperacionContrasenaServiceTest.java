@@ -30,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import co.edu.unbosque.marketplace.ServiciosDePrueba;
 import co.edu.unbosque.marketplace.TestDatos;
 import co.edu.unbosque.marketplace.comun.auditoria.Auditoria;
 import co.edu.unbosque.marketplace.comun.excepcion.SolicitudInvalidaException;
@@ -67,7 +68,8 @@ class RecuperacionContrasenaServiceTest {
 
 	@BeforeEach
 	void preparar() {
-		servicio = new RecuperacionContrasenaService(emision, usuarios, codigos, passwordEncoder, correo, sesiones,
+		servicio = new RecuperacionContrasenaService(emision, ServiciosDePrueba.usuarios(usuarios), codigos,
+				passwordEncoder, correo, sesiones,
 				auditoria, Clock.fixed(AHORA, ZoneOffset.UTC));
 		usuario = TestDatos.usuario(3L, Rol.HUESPED, passwordEncoder.encode("clave-vieja-1"));
 	}

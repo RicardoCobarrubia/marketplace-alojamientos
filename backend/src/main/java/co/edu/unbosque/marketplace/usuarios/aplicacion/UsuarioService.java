@@ -4,8 +4,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
+import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.EstadoCuenta;
+import co.edu.unbosque.marketplace.usuarios.dominio.Usuario.Rol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,6 +72,37 @@ public class UsuarioService {
 		this.reloj = reloj;
 		this.intentosMaximos = intentosMaximos;
 		this.duracionBloqueo = duracionBloqueo;
+	}
+
+	// ---- Lo que el módulo de usuarios ofrece a los demás módulos (ADR-001) ----
+	// Sin @Transactional propio: se unen a la transacción de quien llama, con sus bloqueos.
+
+	public Optional<Usuario> buscarPorId(Long id) {
+		return usuarioRepository.findById(id);
+	}
+
+	/** Busca por correo; el correo se normaliza aquí. */
+	public Optional<Usuario> buscarPorEmail(String email) {
+		return usuarioRepository.findByEmail(Usuario.normalizarEmail(email));
+	}
+
+	/** Bloquea la fila de la cuenta hasta terminar la transacción de quien llama. */
+	public Optional<Usuario> buscarParaActualizar(Long id) {
+		return usuarioRepository.buscarParaActualizar(id);
+	}
+
+	/** Una referencia a la cuenta sin leerla, para asociarla a otra entidad. */
+	public Usuario referencia(Long id) {
+		return usuarioRepository.getReferenceById(id);
+	}
+
+	public List<Usuario> administradoresActivos() {
+		return usuarioRepository.findByRolAndEstadoCuenta(Rol.ADMINISTRADOR, EstadoCuenta.ACTIVA);
+	}
+
+	/** El estado de las cuentas con bloqueo compartido (MA-81): espera una restricción en curso. */
+	public List<String> estadosConBloqueoCompartido(List<Long> ids) {
+		return usuarioRepository.estadosConBloqueoCompartido(ids);
 	}
 
 	// ─────────────────────────────────────────
