@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { CircleAlert, CreditCard, LoaderCircle, Lock, ShieldCheck, X } from 'lucide-react';
+import { CircleAlert, CreditCard, LoaderCircle, Lock, X } from 'lucide-react';
 import { ApiError } from '../../api/ApiError';
 import { mensajeParaUsuario } from '../../api/mensajes';
 import { CampoTexto } from '../../components/CampoTexto';
@@ -148,14 +148,6 @@ export function VentanaPago({ abierta, resumen, alPagar, alCerrar }: Propiedades
         </div>
       ) : (
         <form onSubmit={pagar} noValidate>
-          <div className="alerta alerta--info ventana-pago__aviso">
-            <ShieldCheck size={16} aria-hidden="true" />
-            <span>
-              Pago simulado: no se hace ningún cobro real y los datos de la tarjeta no se guardan ni se envían al
-              servidor. Puedes usar la tarjeta de prueba 4242 4242 4242 4242.
-            </span>
-          </div>
-
           {error && (
             <div className="alerta alerta--error" role="alert">
               <CircleAlert size={16} aria-hidden="true" />
